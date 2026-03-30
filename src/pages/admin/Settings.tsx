@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { supabase, isMockSupabase } from '../../lib/supabase';
 import { mockSettings } from '../../lib/mock-data';
 import type { Tables } from '../../types/database';
@@ -9,24 +9,19 @@ import { Textarea } from '../../components/ui/Textarea';
 import { Switch } from '../../components/ui/Switch';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
 import { useAuth } from '../../contexts/AuthContext';
-import { DISPLAY_SETTINGS_ID } from '../../lib/display-settings';
 
 type Settings = Tables<'display_settings'>;
-
-function createDefaultSettings(): Settings {
-  return { ...mockSettings, id: DISPLAY_SETTINGS_ID };
-}
 
 export function Settings() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const { role } = useAuth();
 
   useEffect(() => {
     if (role === 'admin') {
-      void fetchSettings();
+      fetchSettings();
     } else {
       setLoading(false);
     }
@@ -34,9 +29,8 @@ export function Settings() {
 
   async function fetchSettings() {
     setLoading(true);
-
     if (isMockSupabase) {
-      setSettings(createDefaultSettings());
+      setSettings(mockSettings);
       setLoading(false);
       return;
     }
@@ -44,29 +38,25 @@ export function Settings() {
     const { data, error } = await supabase
       .from('display_settings')
       .select('*')
-      .eq('id', DISPLAY_SETTINGS_ID)
-      .maybeSingle();
+      .limit(1)
+      .single();
 
-    if (error) {
+    if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
       console.error('Error fetching settings:', error);
-      setMessage({ type: 'error', text: 'Asetusten lataus epäonnistui.' });
-      setSettings(createDefaultSettings());
     } else {
-      setSettings(data || createDefaultSettings());
+      setSettings(data || null);
     }
-
     setLoading(false);
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!settings) {
-      return;
-    }
-
+    if (!settings) return;
+    
     setSaving(true);
     setMessage(null);
 
+    // Validate rotation interval
     if (settings.rotation_interval_seconds < 5) {
       setMessage({ type: 'error', text: 'Kierron aikavälin on oltava vähintään 5 sekuntia.' });
       setSaving(false);
@@ -74,37 +64,32 @@ export function Settings() {
     }
 
     if (isMockSupabase) {
-      setSettings({ ...settings, id: DISPLAY_SETTINGS_ID, updated_at: new Date().toISOString() });
-      setSaving(false);
-      setMessage({ type: 'success', text: 'Asetukset tallennettu onnistuneesti (Mock).' });
+      setSettings({ ...settings, updated_at: new Date().toISOString() });
+      setTimeout(() => {
+        setSaving(false);
+        setMessage({ type: 'success', text: 'Asetukset tallennettu onnistuneesti (Mock).' });
+      }, 500);
       return;
     }
 
-    const payload = {
-      id: DISPLAY_SETTINGS_ID,
-      org_name: settings.org_name,
-      welcome_text: settings.welcome_text,
-      rotation_interval_seconds: settings.rotation_interval_seconds,
-      show_announcements: settings.show_announcements,
-      show_events: settings.show_events,
-      show_highlights: settings.show_highlights,
-      show_qr_links: settings.show_qr_links,
-      show_opening_hours: settings.show_opening_hours,
-      opening_hours_text: settings.opening_hours_text,
-      fallback_message: settings.fallback_message,
-      accent_color: settings.accent_color,
-    };
-
-    const { error } = await supabase.from('display_settings').upsert(payload, { onConflict: 'id' });
-    if (error) {
-      setMessage({ type: 'error', text: 'Virhe tallennettaessa asetuksia.' });
-      setSaving(false);
-      return;
+    if (settings.id) {
+      const { error } = await supabase.from('display_settings').update(settings).eq('id', settings.id);
+      if (error) {
+        setMessage({ type: 'error', text: 'Virhe tallennettaessa asetuksia.' });
+      } else {
+        setMessage({ type: 'success', text: 'Asetukset tallennettu onnistuneesti.' });
+      }
+    } else {
+      const { error } = await supabase.from('display_settings').insert(settings);
+      if (error) {
+        setMessage({ type: 'error', text: 'Virhe tallennettaessa asetuksia.' });
+      } else {
+        setMessage({ type: 'success', text: 'Asetukset tallennettu onnistuneesti.' });
+      }
     }
-
-    setMessage({ type: 'success', text: 'Asetukset tallennettu onnistuneesti.' });
+    
     setSaving(false);
-    await fetchSettings();
+    fetchSettings();
   }
 
   if (role !== 'admin') {
@@ -130,11 +115,11 @@ export function Settings() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-slate-900">Asetukset</h1>
-        <p className="mt-2 text-slate-500">Hallitse InfoTV:n yleisiä asetuksia ja ulkoasua.</p>
+        <p className="text-slate-500 mt-2">Hallitse InfoTV:n yleisiä asetuksia ja ulkoasua.</p>
       </div>
 
       {message && (
-        <div className={`rounded-md p-4 ${message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+        <div className={`p-4 rounded-md ${message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
           {message.text}
         </div>
       )}
@@ -146,7 +131,7 @@ export function Settings() {
             <CardDescription>Perustiedot ja näytön käyttäytyminen</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="orgName">Organisaation nimi</Label>
                 <Input
@@ -164,12 +149,7 @@ export function Settings() {
                   min="5"
                   max="60"
                   value={settings.rotation_interval_seconds || 15}
-                  onChange={(e) =>
-                    setSettings({
-                      ...settings,
-                      rotation_interval_seconds: parseInt(e.target.value, 10) || 15,
-                    })
-                  }
+                  onChange={(e) => setSettings({ ...settings, rotation_interval_seconds: parseInt(e.target.value) || 15 })}
                   required
                 />
               </div>
@@ -197,7 +177,7 @@ export function Settings() {
                 <Input
                   id="accentColor"
                   type="color"
-                  className="h-10 w-16 p-1"
+                  className="w-16 h-10 p-1"
                   value={settings.accent_color || '#0ea5e9'}
                   onChange={(e) => setSettings({ ...settings, accent_color: e.target.value })}
                   required
@@ -265,8 +245,8 @@ export function Settings() {
                 onCheckedChange={(checked) => setSettings({ ...settings, show_qr_links: checked })}
               />
             </div>
-            <div className="border-t border-slate-100 pt-4">
-              <div className="mb-4 flex items-center justify-between">
+            <div className="pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-between mb-4">
                 <div className="space-y-0.5">
                   <Label htmlFor="showOpeningHours">Aukioloajat</Label>
                   <p className="text-sm text-slate-500">Näytä aukioloajat sivupalkissa</p>

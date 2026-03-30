@@ -4,7 +4,7 @@
 create extension if not exists "uuid-ossp";
 
 -- 1. Profiles
-create table if not exists public.profiles (
+create table public.profiles (
   id uuid references auth.users on delete cascade not null primary key,
   email text not null,
   role text not null check (role in ('admin', 'editor')) default 'editor',
@@ -12,7 +12,7 @@ create table if not exists public.profiles (
 );
 
 -- 2. Announcements
-create table if not exists public.announcements (
+create table public.announcements (
   id uuid default uuid_generate_v4() primary key,
   title text not null,
   body text not null,
@@ -25,7 +25,7 @@ create table if not exists public.announcements (
 );
 
 -- 3. Events
-create table if not exists public.events (
+create table public.events (
   id uuid default uuid_generate_v4() primary key,
   title text not null,
   description text,
@@ -39,7 +39,7 @@ create table if not exists public.events (
 );
 
 -- 4. Highlights
-create table if not exists public.highlights (
+create table public.highlights (
   id uuid default uuid_generate_v4() primary key,
   title text not null,
   subtitle text,
@@ -57,7 +57,7 @@ create table if not exists public.highlights (
 );
 
 -- 5. QR Links
-create table if not exists public.qr_links (
+create table public.qr_links (
   id uuid default uuid_generate_v4() primary key,
   title text not null,
   url text not null,
@@ -71,8 +71,8 @@ create table if not exists public.qr_links (
 );
 
 -- 6. Display Settings
-create table if not exists public.display_settings (
-  id uuid default '00000000-0000-0000-0000-000000000001'::uuid primary key,
+create table public.display_settings (
+  id uuid default uuid_generate_v4() primary key,
   org_name text not null default 'Eduro',
   welcome_text text,
   rotation_interval_seconds integer not null default 15,
@@ -87,42 +87,16 @@ create table if not exists public.display_settings (
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
-alter table public.display_settings
-  alter column id set default '00000000-0000-0000-0000-000000000001'::uuid;
-
-alter table public.display_settings
-  drop constraint if exists display_settings_singleton_id_check;
-
-alter table public.display_settings
-  add constraint display_settings_singleton_id_check
-  check (id = '00000000-0000-0000-0000-000000000001'::uuid);
-
 -- Insert default settings
-insert into public.display_settings (
-  id,
-  org_name,
-  welcome_text,
-  rotation_interval_seconds,
-  opening_hours_text,
-  fallback_message,
-  accent_color
-)
+insert into public.display_settings (org_name, welcome_text, rotation_interval_seconds, opening_hours_text, fallback_message, accent_color)
 values (
-  '00000000-0000-0000-0000-000000000001'::uuid,
   'Eduro',
   'Tervetuloa Eduroon!',
   15,
   'Ma-Pe 08:00 - 16:00',
   'Ei uusia tiedotteita tällä hetkellä. Mukavaa päivää!',
   '#0ea5e9'
-)
-on conflict (id) do update set
-  org_name = excluded.org_name,
-  welcome_text = excluded.welcome_text,
-  rotation_interval_seconds = excluded.rotation_interval_seconds,
-  opening_hours_text = excluded.opening_hours_text,
-  fallback_message = excluded.fallback_message,
-  accent_color = excluded.accent_color;
+);
 
 -- Row Level Security (RLS) Policies
 
@@ -140,46 +114,33 @@ drop policy if exists "Public read access for events" on public.events;
 drop policy if exists "Public read access for highlights" on public.highlights;
 drop policy if exists "Public read access for qr_links" on public.qr_links;
 drop policy if exists "Public read access for display_settings" on public.display_settings;
-drop policy if exists "Auth read access for announcements" on public.announcements;
-drop policy if exists "Auth read access for events" on public.events;
-drop policy if exists "Auth read access for highlights" on public.highlights;
-drop policy if exists "Auth read access for qr_links" on public.qr_links;
-drop policy if exists "Editor write access for announcements" on public.announcements;
-drop policy if exists "Editor write access for events" on public.events;
-drop policy if exists "Editor write access for highlights" on public.highlights;
-drop policy if exists "Editor write access for qr_links" on public.qr_links;
-drop policy if exists "Admin write access for display_settings" on public.display_settings;
-drop policy if exists "Admin write access for profiles" on public.profiles;
-drop policy if exists "Users can read own profile" on public.profiles;
-drop policy if exists "Public read access for highlight images" on storage.objects;
-drop policy if exists "Editor write access for highlight images" on storage.objects;
-drop policy if exists "Editor update access for highlight images" on storage.objects;
-drop policy if exists "Editor delete access for highlight images" on storage.objects;
+drop policy if exists "Admin full access for announcements" on public.announcements;
+drop policy if exists "Admin full access for events" on public.events;
+drop policy if exists "Admin full access for highlights" on public.highlights;
+drop policy if exists "Admin full access for qr_links" on public.qr_links;
+drop policy if exists "Admin full access for display_settings" on public.display_settings;
+drop policy if exists "Admin full access for profiles" on public.profiles;
 
 -- Public read access for display (only published and active content)
 create policy "Public read access for announcements" on public.announcements for select using (
-  is_published = true and
-  (start_at is null or start_at <= now()) and
+  is_published = true and 
+  (start_at is null or start_at <= now()) and 
   (end_at is null or end_at >= now())
 );
-
 create policy "Public read access for events" on public.events for select using (
-  is_published = true and
+  is_published = true and 
   event_date >= current_date
 );
-
 create policy "Public read access for highlights" on public.highlights for select using (
-  is_published = true and
-  (start_at is null or start_at <= now()) and
+  is_published = true and 
+  (start_at is null or start_at <= now()) and 
   (end_at is null or end_at >= now())
 );
-
 create policy "Public read access for qr_links" on public.qr_links for select using (
-  is_published = true and
-  (start_at is null or start_at <= now()) and
+  is_published = true and 
+  (start_at is null or start_at <= now()) and 
   (end_at is null or end_at >= now())
 );
-
 create policy "Public read access for display_settings" on public.display_settings for select using (true);
 
 -- Authenticated read access (editors/admins can see everything in admin panel)
@@ -192,15 +153,12 @@ create policy "Auth read access for qr_links" on public.qr_links for select to a
 create policy "Editor write access for announcements" on public.announcements for all to authenticated using (
   exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'editor'))
 );
-
 create policy "Editor write access for events" on public.events for all to authenticated using (
   exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'editor'))
 );
-
 create policy "Editor write access for highlights" on public.highlights for all to authenticated using (
   exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'editor'))
 );
-
 create policy "Editor write access for qr_links" on public.qr_links for all to authenticated using (
   exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'editor'))
 );
@@ -209,11 +167,9 @@ create policy "Editor write access for qr_links" on public.qr_links for all to a
 create policy "Admin write access for display_settings" on public.display_settings for all to authenticated using (
   exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
 );
-
 create policy "Admin write access for profiles" on public.profiles for all to authenticated using (
   exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
 );
-
 create policy "Users can read own profile" on public.profiles for select to authenticated using (
   id = auth.uid()
 );
@@ -226,12 +182,6 @@ begin
   return new;
 end;
 $$ language plpgsql;
-
-drop trigger if exists handle_updated_at on public.announcements;
-drop trigger if exists handle_updated_at on public.events;
-drop trigger if exists handle_updated_at on public.highlights;
-drop trigger if exists handle_updated_at on public.qr_links;
-drop trigger if exists handle_updated_at on public.display_settings;
 
 create trigger handle_updated_at before update on public.announcements for each row execute procedure public.handle_updated_at();
 create trigger handle_updated_at before update on public.events for each row execute procedure public.handle_updated_at();
@@ -261,7 +211,7 @@ on conflict (id) do nothing;
 
 create policy "Public read access for highlight images"
   on storage.objects for select
-  using (bucket_id = 'infotv-highlights');
+  using ( bucket_id = 'infotv-highlights' );
 
 create policy "Editor write access for highlight images"
   on storage.objects for insert
@@ -286,3 +236,4 @@ create policy "Editor delete access for highlight images"
     bucket_id = 'infotv-highlights' and
     exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'editor'))
   );
+

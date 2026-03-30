@@ -1,5 +1,4 @@
 import type { Database } from '../types/database';
-import { DISPLAY_SETTINGS_ID } from './display-settings';
 
 type Tables = Database['public']['Tables'];
 
@@ -118,7 +117,7 @@ export const mockQrLinks: Tables['qr_links']['Row'][] = [
 ];
 
 export const mockSettings: Tables['display_settings']['Row'] = {
-  id: DISPLAY_SETTINGS_ID,
+  id: '1',
   org_name: 'Eduro',
   welcome_text: 'Tervetuloa Eduroon!',
   rotation_interval_seconds: 15,
