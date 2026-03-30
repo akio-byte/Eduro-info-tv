@@ -45,8 +45,11 @@ create table public.highlights (
   subtitle text,
   body text,
   image_url text,
+  image_path text,
   cta_label text,
   cta_url text,
+  start_at timestamp with time zone,
+  end_at timestamp with time zone,
   is_published boolean default true not null,
   sort_order integer default 0 not null,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
@@ -59,6 +62,8 @@ create table public.qr_links (
   title text not null,
   url text not null,
   description text,
+  start_at timestamp with time zone,
+  end_at timestamp with time zone,
   is_published boolean default true not null,
   sort_order integer default 0 not null,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
@@ -126,8 +131,16 @@ create policy "Public read access for events" on public.events for select using 
   is_published = true and 
   event_date >= current_date
 );
-create policy "Public read access for highlights" on public.highlights for select using (is_published = true);
-create policy "Public read access for qr_links" on public.qr_links for select using (is_published = true);
+create policy "Public read access for highlights" on public.highlights for select using (
+  is_published = true and 
+  (start_at is null or start_at <= now()) and 
+  (end_at is null or end_at >= now())
+);
+create policy "Public read access for qr_links" on public.qr_links for select using (
+  is_published = true and 
+  (start_at is null or start_at <= now()) and 
+  (end_at is null or end_at >= now())
+);
 create policy "Public read access for display_settings" on public.display_settings for select using (true);
 
 -- Authenticated read access (editors/admins can see everything in admin panel)
@@ -190,4 +203,37 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- 7. Storage
+insert into storage.buckets (id, name, public)
+values ('infotv-highlights', 'infotv-highlights', true)
+on conflict (id) do nothing;
+
+create policy "Public read access for highlight images"
+  on storage.objects for select
+  using ( bucket_id = 'infotv-highlights' );
+
+create policy "Editor write access for highlight images"
+  on storage.objects for insert
+  to authenticated
+  with check (
+    bucket_id = 'infotv-highlights' and
+    exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'editor'))
+  );
+
+create policy "Editor update access for highlight images"
+  on storage.objects for update
+  to authenticated
+  using (
+    bucket_id = 'infotv-highlights' and
+    exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'editor'))
+  );
+
+create policy "Editor delete access for highlight images"
+  on storage.objects for delete
+  to authenticated
+  using (
+    bucket_id = 'infotv-highlights' and
+    exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'editor'))
+  );
 

@@ -56,11 +56,23 @@ export function Display() {
   async function fetchData() {
     if (isMockSupabase) {
       setSettings(mockSettings);
-      setQrLinks(mockQrLinks.filter(q => q.is_published));
+      
+      const now = new Date();
+      setQrLinks(mockQrLinks.filter(q => {
+        if (!q.is_published) return false;
+        if (q.start_at && new Date(q.start_at) > now) return false;
+        if (q.end_at && new Date(q.end_at) < now) return false;
+        return true;
+      }));
       
       const queue: ContentItem[] = [];
       if (mockSettings.show_highlights) {
-        mockHighlights.filter(h => h.is_published).forEach(h => queue.push({ type: 'highlight', data: h }));
+        mockHighlights.filter(h => {
+          if (!h.is_published) return false;
+          if (h.start_at && new Date(h.start_at) > now) return false;
+          if (h.end_at && new Date(h.end_at) < now) return false;
+          return true;
+        }).forEach(h => queue.push({ type: 'highlight', data: h }));
       }
       if (mockSettings.show_announcements) {
         const now = new Date();
@@ -72,7 +84,12 @@ export function Display() {
         }).forEach(a => queue.push({ type: 'announcement', data: a }));
       }
       if (mockSettings.show_events) {
-        mockEvents.filter(e => e.is_published).forEach(e => queue.push({ type: 'event', data: e }));
+        mockEvents.filter(e => {
+          if (!e.is_published) return false;
+          const eventDate = new Date(e.event_date);
+          if (eventDate < new Date(now.setHours(0, 0, 0, 0))) return false;
+          return true;
+        }).forEach(e => queue.push({ type: 'event', data: e }));
       }
       
       setContentQueue(queue);
@@ -91,11 +108,23 @@ export function Display() {
 
       const currentSettings = settingsRes.data || mockSettings;
       setSettings(currentSettings);
-      setQrLinks(qrRes.data || []);
+      
+      const now = new Date();
+      setQrLinks((qrRes.data || []).filter(q => {
+        if (!q.is_published) return false;
+        if (q.start_at && new Date(q.start_at) > now) return false;
+        if (q.end_at && new Date(q.end_at) < now) return false;
+        return true;
+      }));
 
       const queue: ContentItem[] = [];
       if (currentSettings.show_highlights && highRes.data) {
-        highRes.data.forEach(h => queue.push({ type: 'highlight', data: h }));
+        highRes.data.filter(h => {
+          if (!h.is_published) return false;
+          if (h.start_at && new Date(h.start_at) > now) return false;
+          if (h.end_at && new Date(h.end_at) < now) return false;
+          return true;
+        }).forEach(h => queue.push({ type: 'highlight', data: h }));
       }
       if (currentSettings.show_announcements && annRes.data) {
         const now = new Date();

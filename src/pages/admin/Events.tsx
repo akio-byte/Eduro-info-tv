@@ -19,6 +19,7 @@ export function Events() {
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   // Form state
   const [title, setTitle] = useState('');
@@ -64,6 +65,7 @@ export function Events() {
     setIsPublished(true);
     setEditingId(null);
     setIsFormOpen(false);
+    setMessage(null);
   }
 
   function openEditForm(event: Event) {
@@ -76,10 +78,12 @@ export function Events() {
     setIsPublished(event.is_published ?? true);
     setEditingId(event.id);
     setIsFormOpen(true);
+    setMessage(null);
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setMessage(null);
     
     const payload = {
       title,
@@ -94,6 +98,7 @@ export function Events() {
     if (isMockSupabase) {
       if (editingId) {
         setEvents(prev => prev.map(ev => ev.id === editingId ? { ...ev, ...payload, updated_at: new Date().toISOString() } : ev));
+        setMessage({ type: 'success', text: 'Tapahtuma päivitetty (Mock).' });
       } else {
         const newEvent: Event = {
           ...payload,
@@ -102,15 +107,26 @@ export function Events() {
           updated_at: new Date().toISOString(),
         };
         setEvents([...events, newEvent].sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime()));
+        setMessage({ type: 'success', text: 'Tapahtuma luotu (Mock).' });
       }
       resetForm();
       return;
     }
 
     if (editingId) {
-      await supabase.from('events').update(payload).eq('id', editingId);
+      const { error } = await supabase.from('events').update(payload).eq('id', editingId);
+      if (error) {
+        setMessage({ type: 'error', text: 'Tapahtuman päivitys epäonnistui.' });
+        return;
+      }
+      setMessage({ type: 'success', text: 'Tapahtuma päivitetty.' });
     } else {
-      await supabase.from('events').insert(payload);
+      const { error } = await supabase.from('events').insert(payload);
+      if (error) {
+        setMessage({ type: 'error', text: 'Tapahtuman luonti epäonnistui.' });
+        return;
+      }
+      setMessage({ type: 'success', text: 'Tapahtuma luotu.' });
     }
     
     resetForm();
@@ -122,11 +138,17 @@ export function Events() {
 
     if (isMockSupabase) {
       setEvents(prev => prev.filter(e => e.id !== id));
+      setMessage({ type: 'success', text: 'Tapahtuma poistettu (Mock).' });
       return;
     }
 
-    await supabase.from('events').delete().eq('id', id);
-    fetchEvents();
+    const { error } = await supabase.from('events').delete().eq('id', id);
+    if (error) {
+      setMessage({ type: 'error', text: 'Tapahtuman poisto epäonnistui.' });
+    } else {
+      setMessage({ type: 'success', text: 'Tapahtuma poistettu.' });
+      fetchEvents();
+    }
   }
 
   async function togglePublish(id: string, currentStatus: boolean) {
@@ -153,6 +175,12 @@ export function Events() {
           </Button>
         )}
       </div>
+
+      {message && (
+        <div className={`p-4 rounded-md ${message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+          {message.text}
+        </div>
+      )}
 
       {isFormOpen && (
         <Card className="border-slate-200">
@@ -221,7 +249,7 @@ export function Events() {
                   placeholder="esim. Pääauditorio"
                 />
               </div>
-              <div className="flex items-center space-x-2 pt-4">
+              <div className="flex items-center space-x-2 pt-4 border-t border-slate-100">
                 <Switch
                   id="published"
                   checked={isPublished}
@@ -229,7 +257,7 @@ export function Events() {
                 />
                 <Label htmlFor="published">Julkaistu näytöllä</Label>
               </div>
-              <div className="flex justify-end space-x-2 pt-4">
+              <div className="flex justify-end space-x-2 pt-4 border-t border-slate-100">
                 <Button type="button" variant="outline" onClick={resetForm}>Peruuta</Button>
                 <Button type="submit">Tallenna</Button>
               </div>
@@ -248,14 +276,26 @@ export function Events() {
             </CardContent>
           </Card>
         ) : (
-          events.map((event) => (
-            <Card key={event.id} className={!event.is_published ? 'opacity-60' : ''}>
+          events.map((event) => {
+            const now = new Date();
+            const eventDate = new Date(event.event_date);
+            const isPast = eventDate < new Date(now.setHours(0, 0, 0, 0));
+            const isActive = event.is_published && !isPast;
+
+            return (
+            <Card key={event.id} className={!isActive ? 'opacity-60' : ''}>
               <CardContent className="flex items-start justify-between p-6">
                 <div className="space-y-2">
                   <div className="flex items-center space-x-2">
                     <h3 className="font-semibold text-slate-900">{event.title}</h3>
                     {!event.is_published && (
                       <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-800">Piilotettu</span>
+                    )}
+                    {event.is_published && isPast && (
+                      <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-800">Menneisyydessä</span>
+                    )}
+                    {isActive && (
+                      <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800">Aktiivinen</span>
                     )}
                   </div>
                   <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500">
@@ -298,7 +338,8 @@ export function Events() {
                 </div>
               </CardContent>
             </Card>
-          ))
+            );
+          })
         )}
       </div>
     </div>

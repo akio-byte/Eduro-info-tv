@@ -203,9 +203,9 @@ export function Announcements() {
                   rows={4}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-slate-100 pt-4">
                 <div className="space-y-2">
-                  <Label htmlFor="startAt">Näytetään alkaen</Label>
+                  <Label htmlFor="startAt">Julkaisu alkaa (valinnainen)</Label>
                   <Input
                     id="startAt"
                     type="datetime-local"
@@ -214,7 +214,7 @@ export function Announcements() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="endAt">Näytetään asti</Label>
+                  <Label htmlFor="endAt">Julkaisu päättyy (valinnainen)</Label>
                   <Input
                     id="endAt"
                     type="datetime-local"
@@ -223,7 +223,7 @@ export function Announcements() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-slate-100 pt-4">
                 <div className="space-y-2">
                   <Label htmlFor="priority">Prioriteetti</Label>
                   <select
@@ -246,7 +246,7 @@ export function Announcements() {
                   <Label htmlFor="published">Julkaistu näytöllä</Label>
                 </div>
               </div>
-              <div className="flex justify-end space-x-2 pt-4">
+              <div className="flex justify-end space-x-2 pt-4 border-t border-slate-100">
                 <Button type="button" variant="outline" onClick={resetForm}>Peruuta</Button>
                 <Button type="submit">Tallenna</Button>
               </div>
@@ -266,9 +266,10 @@ export function Announcements() {
           </Card>
         ) : (
           announcements.map((announcement) => {
-            const isActive = announcement.is_published && 
-              (!announcement.start_at || new Date(announcement.start_at) <= new Date()) &&
-              (!announcement.end_at || new Date(announcement.end_at) >= new Date());
+            const now = new Date();
+            const isScheduled = announcement.start_at && new Date(announcement.start_at) > now;
+            const isExpired = announcement.end_at && new Date(announcement.end_at) < now;
+            const isActive = announcement.is_published && !isScheduled && !isExpired;
 
             return (
               <Card key={announcement.id} className={!isActive ? 'opacity-60' : ''}>
@@ -282,8 +283,14 @@ export function Announcements() {
                       {!announcement.is_published && (
                         <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-800">Piilotettu</span>
                       )}
-                      {announcement.is_published && !isActive && (
-                        <span className="rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-semibold text-yellow-800">Ei aktiivinen</span>
+                      {announcement.is_published && isScheduled && (
+                        <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800">Ajastettu</span>
+                      )}
+                      {announcement.is_published && isExpired && (
+                        <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-800">Päättynyt</span>
+                      )}
+                      {isActive && (
+                        <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800">Aktiivinen</span>
                       )}
                     </div>
                     <p className="text-sm text-slate-500 line-clamp-2">{announcement.body}</p>

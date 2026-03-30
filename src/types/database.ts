@@ -109,8 +109,11 @@ export type Database = {
           subtitle: string | null
           body: string | null
           image_url: string | null
+          image_path: string | null
           cta_label: string | null
           cta_url: string | null
+          start_at: string | null
+          end_at: string | null
           is_published: boolean
           sort_order: number
           created_at: string
@@ -122,8 +125,11 @@ export type Database = {
           subtitle?: string | null
           body?: string | null
           image_url?: string | null
+          image_path?: string | null
           cta_label?: string | null
           cta_url?: string | null
+          start_at?: string | null
+          end_at?: string | null
           is_published?: boolean
           sort_order?: number
           created_at?: string
@@ -135,8 +141,11 @@ export type Database = {
           subtitle?: string | null
           body?: string | null
           image_url?: string | null
+          image_path?: string | null
           cta_label?: string | null
           cta_url?: string | null
+          start_at?: string | null
+          end_at?: string | null
           is_published?: boolean
           sort_order?: number
           created_at?: string
@@ -149,6 +158,8 @@ export type Database = {
           title: string
           url: string
           description: string | null
+          start_at: string | null
+          end_at: string | null
           is_published: boolean
           sort_order: number
           created_at: string
@@ -159,6 +170,8 @@ export type Database = {
           title: string
           url: string
           description?: string | null
+          start_at?: string | null
+          end_at?: string | null
           is_published?: boolean
           sort_order?: number
           created_at?: string
@@ -169,6 +182,8 @@ export type Database = {
           title?: string
           url?: string
           description?: string | null
+          start_at?: string | null
+          end_at?: string | null
           is_published?: boolean
           sort_order?: number
           created_at?: string

@@ -15,21 +15,53 @@ export function Dashboard() {
   useEffect(() => {
     async function fetchStats() {
       if (isMockSupabase) {
+        const now = new Date();
         setStats({
-          announcements: mockAnnouncements.filter(a => a.is_published).length,
-          events: mockEvents.filter(e => e.is_published).length,
-          highlights: mockHighlights.filter(h => h.is_published).length,
-          qrLinks: mockQrLinks.filter(q => q.is_published).length,
+          announcements: mockAnnouncements.filter(a => {
+            if (!a.is_published) return false;
+            if (a.start_at && new Date(a.start_at) > now) return false;
+            if (a.end_at && new Date(a.end_at) < now) return false;
+            return true;
+          }).length,
+          events: mockEvents.filter(e => {
+            if (!e.is_published) return false;
+            const eventDate = new Date(e.event_date);
+            if (eventDate < new Date(now.setHours(0, 0, 0, 0))) return false;
+            return true;
+          }).length,
+          highlights: mockHighlights.filter(h => {
+            if (!h.is_published) return false;
+            if (h.start_at && new Date(h.start_at) > now) return false;
+            if (h.end_at && new Date(h.end_at) < now) return false;
+            return true;
+          }).length,
+          qrLinks: mockQrLinks.filter(q => {
+            if (!q.is_published) return false;
+            if (q.start_at && new Date(q.start_at) > now) return false;
+            if (q.end_at && new Date(q.end_at) < now) return false;
+            return true;
+          }).length,
         });
         return;
       }
 
-      // In a real app, you might want to run these in parallel with Promise.all
+      const now = new Date().toISOString();
       const [announcements, events, highlights, qrLinks] = await Promise.all([
-        supabase.from('announcements').select('*', { count: 'exact', head: true }).eq('is_published', true),
-        supabase.from('events').select('*', { count: 'exact', head: true }).eq('is_published', true),
-        supabase.from('highlights').select('*', { count: 'exact', head: true }).eq('is_published', true),
-        supabase.from('qr_links').select('*', { count: 'exact', head: true }).eq('is_published', true),
+        supabase.from('announcements').select('*', { count: 'exact', head: true })
+          .eq('is_published', true)
+          .or(`start_at.is.null,start_at.lte.${now}`)
+          .or(`end_at.is.null,end_at.gte.${now}`),
+        supabase.from('events').select('*', { count: 'exact', head: true })
+          .eq('is_published', true)
+          .gte('event_date', new Date(new Date().setHours(0, 0, 0, 0)).toISOString().split('T')[0]),
+        supabase.from('highlights').select('*', { count: 'exact', head: true })
+          .eq('is_published', true)
+          .or(`start_at.is.null,start_at.lte.${now}`)
+          .or(`end_at.is.null,end_at.gte.${now}`),
+        supabase.from('qr_links').select('*', { count: 'exact', head: true })
+          .eq('is_published', true)
+          .or(`start_at.is.null,start_at.lte.${now}`)
+          .or(`end_at.is.null,end_at.gte.${now}`),
       ]);
 
       setStats({
