@@ -63,7 +63,13 @@ export function Display() {
         mockHighlights.filter(h => h.is_published).forEach(h => queue.push({ type: 'highlight', data: h }));
       }
       if (mockSettings.show_announcements) {
-        mockAnnouncements.filter(a => a.is_published).forEach(a => queue.push({ type: 'announcement', data: a }));
+        const now = new Date();
+        mockAnnouncements.filter(a => {
+          if (!a.is_published) return false;
+          if (a.start_at && new Date(a.start_at) > now) return false;
+          if (a.end_at && new Date(a.end_at) < now) return false;
+          return true;
+        }).forEach(a => queue.push({ type: 'announcement', data: a }));
       }
       if (mockSettings.show_events) {
         mockEvents.filter(e => e.is_published).forEach(e => queue.push({ type: 'event', data: e }));
@@ -92,7 +98,13 @@ export function Display() {
         highRes.data.forEach(h => queue.push({ type: 'highlight', data: h }));
       }
       if (currentSettings.show_announcements && annRes.data) {
-        annRes.data.forEach(a => queue.push({ type: 'announcement', data: a }));
+        const now = new Date();
+        annRes.data.filter(a => {
+          if (!a.is_published) return false;
+          if (a.start_at && new Date(a.start_at) > now) return false;
+          if (a.end_at && new Date(a.end_at) < now) return false;
+          return true;
+        }).forEach(a => queue.push({ type: 'announcement', data: a }));
       }
       if (currentSettings.show_events && evRes.data) {
         evRes.data.forEach(e => queue.push({ type: 'event', data: e }));

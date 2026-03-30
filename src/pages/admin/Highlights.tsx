@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { supabase, isMockSupabase } from '../../lib/supabase';
 import { mockHighlights } from '../../lib/mock-data';
 import type { Tables } from '../../types/database';
@@ -65,18 +65,18 @@ export function Highlights() {
   }
 
   function openEditForm(highlight: Highlight) {
-    setTitle(highlight.title);
+    setTitle(highlight.title || '');
     setSubtitle(highlight.subtitle || '');
     setBody(highlight.body || '');
     setImageUrl(highlight.image_url || '');
     setCtaLabel(highlight.cta_label || '');
     setCtaUrl(highlight.cta_url || '');
-    setIsPublished(highlight.is_published);
+    setIsPublished(highlight.is_published ?? true);
     setEditingId(highlight.id);
     setIsFormOpen(true);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     
     const payload = {

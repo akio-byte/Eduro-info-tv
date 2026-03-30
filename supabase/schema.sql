@@ -103,20 +103,63 @@ alter table public.highlights enable row level security;
 alter table public.qr_links enable row level security;
 alter table public.display_settings enable row level security;
 
--- Public read access for display
-create policy "Public read access for announcements" on public.announcements for select using (true);
-create policy "Public read access for events" on public.events for select using (true);
-create policy "Public read access for highlights" on public.highlights for select using (true);
-create policy "Public read access for qr_links" on public.qr_links for select using (true);
+-- Drop existing policies if any (for clean re-runs)
+drop policy if exists "Public read access for announcements" on public.announcements;
+drop policy if exists "Public read access for events" on public.events;
+drop policy if exists "Public read access for highlights" on public.highlights;
+drop policy if exists "Public read access for qr_links" on public.qr_links;
+drop policy if exists "Public read access for display_settings" on public.display_settings;
+drop policy if exists "Admin full access for announcements" on public.announcements;
+drop policy if exists "Admin full access for events" on public.events;
+drop policy if exists "Admin full access for highlights" on public.highlights;
+drop policy if exists "Admin full access for qr_links" on public.qr_links;
+drop policy if exists "Admin full access for display_settings" on public.display_settings;
+drop policy if exists "Admin full access for profiles" on public.profiles;
+
+-- Public read access for display (only published and active content)
+create policy "Public read access for announcements" on public.announcements for select using (
+  is_published = true and 
+  (start_at is null or start_at <= now()) and 
+  (end_at is null or end_at >= now())
+);
+create policy "Public read access for events" on public.events for select using (
+  is_published = true and 
+  event_date >= current_date
+);
+create policy "Public read access for highlights" on public.highlights for select using (is_published = true);
+create policy "Public read access for qr_links" on public.qr_links for select using (is_published = true);
 create policy "Public read access for display_settings" on public.display_settings for select using (true);
 
--- Admin full access
-create policy "Admin full access for announcements" on public.announcements for all using (auth.role() = 'authenticated');
-create policy "Admin full access for events" on public.events for all using (auth.role() = 'authenticated');
-create policy "Admin full access for highlights" on public.highlights for all using (auth.role() = 'authenticated');
-create policy "Admin full access for qr_links" on public.qr_links for all using (auth.role() = 'authenticated');
-create policy "Admin full access for display_settings" on public.display_settings for all using (auth.role() = 'authenticated');
-create policy "Admin full access for profiles" on public.profiles for all using (auth.role() = 'authenticated');
+-- Authenticated read access (editors/admins can see everything in admin panel)
+create policy "Auth read access for announcements" on public.announcements for select to authenticated using (true);
+create policy "Auth read access for events" on public.events for select to authenticated using (true);
+create policy "Auth read access for highlights" on public.highlights for select to authenticated using (true);
+create policy "Auth read access for qr_links" on public.qr_links for select to authenticated using (true);
+
+-- Editor/Admin write access for content
+create policy "Editor write access for announcements" on public.announcements for all to authenticated using (
+  exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'editor'))
+);
+create policy "Editor write access for events" on public.events for all to authenticated using (
+  exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'editor'))
+);
+create policy "Editor write access for highlights" on public.highlights for all to authenticated using (
+  exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'editor'))
+);
+create policy "Editor write access for qr_links" on public.qr_links for all to authenticated using (
+  exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'editor'))
+);
+
+-- Admin ONLY write access for settings and profiles
+create policy "Admin write access for display_settings" on public.display_settings for all to authenticated using (
+  exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+);
+create policy "Admin write access for profiles" on public.profiles for all to authenticated using (
+  exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+);
+create policy "Users can read own profile" on public.profiles for select to authenticated using (
+  id = auth.uid()
+);
 
 -- Triggers for updated_at
 create or replace function public.handle_updated_at()
@@ -132,3 +175,19 @@ create trigger handle_updated_at before update on public.events for each row exe
 create trigger handle_updated_at before update on public.highlights for each row execute procedure public.handle_updated_at();
 create trigger handle_updated_at before update on public.qr_links for each row execute procedure public.handle_updated_at();
 create trigger handle_updated_at before update on public.display_settings for each row execute procedure public.handle_updated_at();
+
+-- Trigger to automatically create a profile for new users
+create or replace function public.handle_new_user()
+returns trigger as $$
+begin
+  insert into public.profiles (id, email, role)
+  values (new.id, new.email, 'editor');
+  return new;
+end;
+$$ language plpgsql security definer;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+

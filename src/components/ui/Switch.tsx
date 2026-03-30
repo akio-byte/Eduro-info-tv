@@ -30,7 +30,7 @@ const Switch = React.forwardRef<HTMLInputElement, SwitchProps>(
         <input
           type="checkbox"
           className="sr-only"
-          checked={checked}
+          checked={checked || false}
           onChange={(e) => onCheckedChange?.(e.target.checked)}
           ref={ref}
           {...props}

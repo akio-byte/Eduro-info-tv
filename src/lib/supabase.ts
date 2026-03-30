@@ -1,10 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '../types/database';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://mock.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'mock-key';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+export const isMockSupabase = import.meta.env.VITE_ENABLE_MOCK_MODE === 'true';
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+if (!isMockSupabase && (!supabaseUrl || !supabaseAnonKey)) {
+  throw new Error(
+    'Missing Supabase environment variables. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, or enable mock mode with VITE_ENABLE_MOCK_MODE=true.'
+  );
+}
 
-// Helper to check if we are using mock credentials (for preview purposes)
-export const isMockSupabase = supabaseUrl === 'https://mock.supabase.co';
+// If in mock mode but missing URL/Key, provide dummy values to prevent createClient from crashing,
+// even though we won't actually use the client for data fetching.
+export const supabase = createClient<any>(
+  supabaseUrl || 'https://mock.supabase.co',
+  supabaseAnonKey || 'mock-key'
+);
+

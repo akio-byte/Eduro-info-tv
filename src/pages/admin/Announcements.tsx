@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { supabase, isMockSupabase } from '../../lib/supabase';
 import { mockAnnouncements } from '../../lib/mock-data';
 import type { Tables } from '../../types/database';
@@ -8,7 +8,7 @@ import { Label } from '../../components/ui/Label';
 import { Textarea } from '../../components/ui/Textarea';
 import { Switch } from '../../components/ui/Switch';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
-import { Plus, Pencil, Trash2, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Calendar as CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { fi } from 'date-fns/locale';
 
@@ -19,12 +19,15 @@ export function Announcements() {
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   // Form state
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [priority, setPriority] = useState<'high' | 'normal' | 'low'>('normal');
   const [isPublished, setIsPublished] = useState(true);
+  const [startAt, setStartAt] = useState('');
+  const [endAt, setEndAt] = useState('');
 
   useEffect(() => {
     fetchAnnouncements();
@@ -56,27 +59,36 @@ export function Announcements() {
     setBody('');
     setPriority('normal');
     setIsPublished(true);
+    setStartAt('');
+    setEndAt('');
     setEditingId(null);
     setIsFormOpen(false);
+    setMessage(null);
   }
 
   function openEditForm(announcement: Announcement) {
-    setTitle(announcement.title);
-    setBody(announcement.body);
-    setPriority(announcement.priority);
-    setIsPublished(announcement.is_published);
+    setTitle(announcement.title || '');
+    setBody(announcement.body || '');
+    setPriority(announcement.priority || 'normal');
+    setIsPublished(announcement.is_published ?? true);
+    setStartAt(announcement.start_at ? announcement.start_at.substring(0, 16) : '');
+    setEndAt(announcement.end_at ? announcement.end_at.substring(0, 16) : '');
     setEditingId(announcement.id);
     setIsFormOpen(true);
+    setMessage(null);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setMessage(null);
     
     const payload = {
       title,
       body,
       priority,
       is_published: isPublished,
+      start_at: startAt ? new Date(startAt).toISOString() : null,
+      end_at: endAt ? new Date(endAt).toISOString() : null,
     };
 
     if (isMockSupabase) {
@@ -86,21 +98,24 @@ export function Announcements() {
         const newAnnouncement: Announcement = {
           ...payload,
           id: Math.random().toString(),
-          start_at: new Date().toISOString(),
-          end_at: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
         setAnnouncements([newAnnouncement, ...announcements]);
       }
       resetForm();
+      setMessage({ type: 'success', text: 'Tiedote tallennettu (Mock).' });
       return;
     }
 
     if (editingId) {
-      await supabase.from('announcements').update(payload).eq('id', editingId);
+      const { error } = await supabase.from('announcements').update(payload).eq('id', editingId);
+      if (error) setMessage({ type: 'error', text: 'Virhe tallennettaessa tiedotetta.' });
+      else setMessage({ type: 'success', text: 'Tiedote päivitetty.' });
     } else {
-      await supabase.from('announcements').insert(payload);
+      const { error } = await supabase.from('announcements').insert(payload);
+      if (error) setMessage({ type: 'error', text: 'Virhe luotaessa tiedotetta.' });
+      else setMessage({ type: 'success', text: 'Tiedote luotu.' });
     }
     
     resetForm();
@@ -112,10 +127,14 @@ export function Announcements() {
 
     if (isMockSupabase) {
       setAnnouncements(prev => prev.filter(a => a.id !== id));
+      setMessage({ type: 'success', text: 'Tiedote poistettu (Mock).' });
       return;
     }
 
-    await supabase.from('announcements').delete().eq('id', id);
+    const { error } = await supabase.from('announcements').delete().eq('id', id);
+    if (error) setMessage({ type: 'error', text: 'Virhe poistettaessa tiedotetta.' });
+    else setMessage({ type: 'success', text: 'Tiedote poistettu.' });
+    
     fetchAnnouncements();
   }
 
@@ -144,6 +163,12 @@ export function Announcements() {
         )}
       </div>
 
+      {message && !isFormOpen && (
+        <div className={`p-4 rounded-md ${message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+          {message.text}
+        </div>
+      )}
+
       {isFormOpen && (
         <Card className="border-slate-200">
           <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 bg-slate-50/50 pb-4">
@@ -153,6 +178,11 @@ export function Announcements() {
             </Button>
           </CardHeader>
           <CardContent className="pt-6">
+            {message && (
+              <div className={`mb-4 p-4 rounded-md ${message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+                {message.text}
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="title">Otsikko</Label>
@@ -172,6 +202,26 @@ export function Announcements() {
                   required
                   rows={4}
                 />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="startAt">Näytetään alkaen</Label>
+                  <Input
+                    id="startAt"
+                    type="datetime-local"
+                    value={startAt}
+                    onChange={(e) => setStartAt(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="endAt">Näytetään asti</Label>
+                  <Input
+                    id="endAt"
+                    type="datetime-local"
+                    value={endAt}
+                    onChange={(e) => setEndAt(e.target.value)}
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -215,43 +265,59 @@ export function Announcements() {
             </CardContent>
           </Card>
         ) : (
-          announcements.map((announcement) => (
-            <Card key={announcement.id} className={!announcement.is_published ? 'opacity-60' : ''}>
-              <CardContent className="flex items-start justify-between p-6">
-                <div className="space-y-1">
-                  <div className="flex items-center space-x-2">
-                    <h3 className="font-semibold text-slate-900">{announcement.title}</h3>
-                    {announcement.priority === 'high' && (
-                      <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-800">Tärkeä</span>
-                    )}
-                    {!announcement.is_published && (
-                      <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-800">Piilotettu</span>
-                    )}
+          announcements.map((announcement) => {
+            const isActive = announcement.is_published && 
+              (!announcement.start_at || new Date(announcement.start_at) <= new Date()) &&
+              (!announcement.end_at || new Date(announcement.end_at) >= new Date());
+
+            return (
+              <Card key={announcement.id} className={!isActive ? 'opacity-60' : ''}>
+                <CardContent className="flex items-start justify-between p-6">
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-2">
+                      <h3 className="font-semibold text-slate-900">{announcement.title}</h3>
+                      {announcement.priority === 'high' && (
+                        <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-800">Tärkeä</span>
+                      )}
+                      {!announcement.is_published && (
+                        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-800">Piilotettu</span>
+                      )}
+                      {announcement.is_published && !isActive && (
+                        <span className="rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-semibold text-yellow-800">Ei aktiivinen</span>
+                      )}
+                    </div>
+                    <p className="text-sm text-slate-500 line-clamp-2">{announcement.body}</p>
+                    <div className="flex flex-wrap gap-4 pt-2 text-xs text-slate-400">
+                      <span>Luotu: {format(new Date(announcement.created_at), 'd.M.yyyy HH:mm', { locale: fi })}</span>
+                      {(announcement.start_at || announcement.end_at) && (
+                        <span className="flex items-center">
+                          <CalendarIcon className="mr-1 h-3 w-3" />
+                          {announcement.start_at ? format(new Date(announcement.start_at), 'd.M.yyyy HH:mm') : 'Heti'} - 
+                          {announcement.end_at ? format(new Date(announcement.end_at), 'd.M.yyyy HH:mm') : 'Toistaiseksi'}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-sm text-slate-500 line-clamp-2">{announcement.body}</p>
-                  <p className="text-xs text-slate-400 pt-2">
-                    Luotu: {format(new Date(announcement.created_at), 'd.M.yyyy HH:mm', { locale: fi })}
-                  </p>
-                </div>
-                <div className="flex items-center space-x-2 ml-4">
-                  <div className="flex items-center space-x-2 mr-4">
-                    <Label htmlFor={`pub-${announcement.id}`} className="sr-only">Julkaistu</Label>
-                    <Switch
-                      id={`pub-${announcement.id}`}
-                      checked={announcement.is_published}
-                      onCheckedChange={() => togglePublish(announcement.id, announcement.is_published)}
-                    />
+                  <div className="flex items-center space-x-2 ml-4">
+                    <div className="flex items-center space-x-2 mr-4">
+                      <Label htmlFor={`pub-${announcement.id}`} className="sr-only">Julkaistu</Label>
+                      <Switch
+                        id={`pub-${announcement.id}`}
+                        checked={announcement.is_published}
+                        onCheckedChange={() => togglePublish(announcement.id, announcement.is_published)}
+                      />
+                    </div>
+                    <Button variant="outline" size="icon" onClick={() => openEditForm(announcement)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" size="icon" className="text-red-500 hover:text-red-600" onClick={() => handleDelete(announcement.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <Button variant="outline" size="icon" onClick={() => openEditForm(announcement)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="icon" className="text-red-500 hover:text-red-600" onClick={() => handleDelete(announcement.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                </CardContent>
+              </Card>
+            );
+          })
         )}
       </div>
     </div>

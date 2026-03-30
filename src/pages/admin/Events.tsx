@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { supabase, isMockSupabase } from '../../lib/supabase';
 import { mockEvents } from '../../lib/mock-data';
 import type { Tables } from '../../types/database';
@@ -8,7 +8,7 @@ import { Label } from '../../components/ui/Label';
 import { Textarea } from '../../components/ui/Textarea';
 import { Switch } from '../../components/ui/Switch';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
-import { Plus, Pencil, Trash2, X, MapPin, Clock } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, MapPin, Clock, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { fi } from 'date-fns/locale';
 
@@ -67,18 +67,18 @@ export function Events() {
   }
 
   function openEditForm(event: Event) {
-    setTitle(event.title);
+    setTitle(event.title || '');
     setDescription(event.description || '');
-    setEventDate(event.event_date.split('T')[0]);
+    setEventDate(event.event_date ? event.event_date.split('T')[0] : '');
     setStartTime(event.start_time || '');
     setEndTime(event.end_time || '');
     setLocation(event.location || '');
-    setIsPublished(event.is_published);
+    setIsPublished(event.is_published ?? true);
     setEditingId(event.id);
     setIsFormOpen(true);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     
     const payload = {

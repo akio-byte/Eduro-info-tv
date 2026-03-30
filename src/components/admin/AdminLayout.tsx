@@ -1,38 +1,9 @@
-import { useEffect, useState } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, Navigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
-import { supabase, isMockSupabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 export function AdminLayout() {
-  const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      if (isMockSupabase) {
-        // Skip auth check if using mock data
-        setIsLoading(false);
-        return;
-      }
-
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        navigate('/admin/login');
-      } else {
-        setIsLoading(false);
-      }
-    };
-
-    checkAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session && !isMockSupabase) {
-        navigate('/admin/login');
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+  const { user, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -40,6 +11,10 @@ export function AdminLayout() {
         <div className="text-slate-500">Ladataan...</div>
       </div>
     );
+  }
+
+  if (!user) {
+    return <Navigate to="/admin/login" replace />;
   }
 
   return (

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { supabase, isMockSupabase } from '../../lib/supabase';
 import { mockSettings } from '../../lib/mock-data';
 import type { Tables } from '../../types/database';
@@ -8,6 +8,7 @@ import { Label } from '../../components/ui/Label';
 import { Textarea } from '../../components/ui/Textarea';
 import { Switch } from '../../components/ui/Switch';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
+import { useAuth } from '../../contexts/AuthContext';
 
 type Settings = Tables<'display_settings'>;
 
@@ -15,10 +16,16 @@ export function Settings() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const { role } = useAuth();
 
   useEffect(() => {
-    fetchSettings();
-  }, []);
+    if (role === 'admin') {
+      fetchSettings();
+    } else {
+      setLoading(false);
+    }
+  }, [role]);
 
   async function fetchSettings() {
     setLoading(true);
@@ -42,26 +49,58 @@ export function Settings() {
     setLoading(false);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!settings) return;
     
     setSaving(true);
+    setMessage(null);
+
+    // Validate rotation interval
+    if (settings.rotation_interval_seconds < 5) {
+      setMessage({ type: 'error', text: 'Kierron aikavälin on oltava vähintään 5 sekuntia.' });
+      setSaving(false);
+      return;
+    }
 
     if (isMockSupabase) {
       setSettings({ ...settings, updated_at: new Date().toISOString() });
-      setTimeout(() => setSaving(false), 500);
+      setTimeout(() => {
+        setSaving(false);
+        setMessage({ type: 'success', text: 'Asetukset tallennettu onnistuneesti (Mock).' });
+      }, 500);
       return;
     }
 
     if (settings.id) {
-      await supabase.from('display_settings').update(settings).eq('id', settings.id);
+      const { error } = await supabase.from('display_settings').update(settings).eq('id', settings.id);
+      if (error) {
+        setMessage({ type: 'error', text: 'Virhe tallennettaessa asetuksia.' });
+      } else {
+        setMessage({ type: 'success', text: 'Asetukset tallennettu onnistuneesti.' });
+      }
     } else {
-      await supabase.from('display_settings').insert(settings);
+      const { error } = await supabase.from('display_settings').insert(settings);
+      if (error) {
+        setMessage({ type: 'error', text: 'Virhe tallennettaessa asetuksia.' });
+      } else {
+        setMessage({ type: 'success', text: 'Asetukset tallennettu onnistuneesti.' });
+      }
     }
     
     setSaving(false);
     fetchSettings();
+  }
+
+  if (role !== 'admin') {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-slate-900">Ei käyttöoikeutta</h2>
+          <p className="mt-2 text-slate-500">Vain ylläpitäjät voivat muokata järjestelmän asetuksia.</p>
+        </div>
+      </div>
+    );
   }
 
   if (loading) {
@@ -79,6 +118,12 @@ export function Settings() {
         <p className="text-slate-500 mt-2">Hallitse InfoTV:n yleisiä asetuksia ja ulkoasua.</p>
       </div>
 
+      {message && (
+        <div className={`p-4 rounded-md ${message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+          {message.text}
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card>
           <CardHeader>
@@ -91,7 +136,7 @@ export function Settings() {
                 <Label htmlFor="orgName">Organisaation nimi</Label>
                 <Input
                   id="orgName"
-                  value={settings.org_name}
+                  value={settings.org_name || ''}
                   onChange={(e) => setSettings({ ...settings, org_name: e.target.value })}
                   required
                 />
@@ -103,8 +148,8 @@ export function Settings() {
                   type="number"
                   min="5"
                   max="60"
-                  value={settings.rotation_interval_seconds}
-                  onChange={(e) => setSettings({ ...settings, rotation_interval_seconds: parseInt(e.target.value) })}
+                  value={settings.rotation_interval_seconds || 15}
+                  onChange={(e) => setSettings({ ...settings, rotation_interval_seconds: parseInt(e.target.value) || 15 })}
                   required
                 />
               </div>
@@ -133,13 +178,13 @@ export function Settings() {
                   id="accentColor"
                   type="color"
                   className="w-16 h-10 p-1"
-                  value={settings.accent_color}
+                  value={settings.accent_color || '#0ea5e9'}
                   onChange={(e) => setSettings({ ...settings, accent_color: e.target.value })}
                   required
                 />
                 <Input
                   type="text"
-                  value={settings.accent_color}
+                  value={settings.accent_color || '#0ea5e9'}
                   onChange={(e) => setSettings({ ...settings, accent_color: e.target.value })}
                   className="flex-1"
                   pattern="^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
@@ -163,7 +208,7 @@ export function Settings() {
               </div>
               <Switch
                 id="showAnnouncements"
-                checked={settings.show_announcements}
+                checked={settings.show_announcements || false}
                 onCheckedChange={(checked) => setSettings({ ...settings, show_announcements: checked })}
               />
             </div>
@@ -174,7 +219,7 @@ export function Settings() {
               </div>
               <Switch
                 id="showEvents"
-                checked={settings.show_events}
+                checked={settings.show_events || false}
                 onCheckedChange={(checked) => setSettings({ ...settings, show_events: checked })}
               />
             </div>
@@ -185,7 +230,7 @@ export function Settings() {
               </div>
               <Switch
                 id="showHighlights"
-                checked={settings.show_highlights}
+                checked={settings.show_highlights || false}
                 onCheckedChange={(checked) => setSettings({ ...settings, show_highlights: checked })}
               />
             </div>
@@ -196,7 +241,7 @@ export function Settings() {
               </div>
               <Switch
                 id="showQrLinks"
-                checked={settings.show_qr_links}
+                checked={settings.show_qr_links || false}
                 onCheckedChange={(checked) => setSettings({ ...settings, show_qr_links: checked })}
               />
             </div>
@@ -208,7 +253,7 @@ export function Settings() {
                 </div>
                 <Switch
                   id="showOpeningHours"
-                  checked={settings.show_opening_hours}
+                  checked={settings.show_opening_hours || false}
                   onCheckedChange={(checked) => setSettings({ ...settings, show_opening_hours: checked })}
                 />
               </div>

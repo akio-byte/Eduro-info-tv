@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, FormEvent } from 'react';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { supabase, isMockSupabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Label } from '../../components/ui/Label';
@@ -13,14 +14,28 @@ export function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { user, isLoading } = useAuth();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50">
+        <div className="text-slate-500">Ladataan...</div>
+      </div>
+    );
+  }
+
+  if (user) {
+    return <Navigate to="/admin" replace />;
+  }
+
+  const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
     if (isMockSupabase) {
-      // Mock login success
+      // Mock login success handled by AuthContext (it sets mock user on mount)
+      // but if we are here, it means we somehow bypassed it. Let's just navigate.
       setTimeout(() => {
         navigate('/admin');
       }, 500);

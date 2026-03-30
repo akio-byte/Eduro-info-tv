@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { supabase, isMockSupabase } from '../../lib/supabase';
 import { mockQrLinks } from '../../lib/mock-data';
 import type { Tables } from '../../types/database';
@@ -60,15 +60,15 @@ export function QrLinks() {
   }
 
   function openEditForm(qrLink: QrLink) {
-    setTitle(qrLink.title);
-    setUrl(qrLink.url);
+    setTitle(qrLink.title || '');
+    setUrl(qrLink.url || '');
     setDescription(qrLink.description || '');
-    setIsPublished(qrLink.is_published);
+    setIsPublished(qrLink.is_published ?? true);
     setEditingId(qrLink.id);
     setIsFormOpen(true);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     
     const payload = {
