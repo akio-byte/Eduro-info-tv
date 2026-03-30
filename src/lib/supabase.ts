@@ -13,7 +13,7 @@ if (!isMockSupabase && (!supabaseUrl || !supabaseAnonKey)) {
 
 // If in mock mode but missing URL/Key, provide dummy values to prevent createClient from crashing,
 // even though we won't actually use the client for data fetching.
-export const supabase = createClient<Database>(
+export const supabase = createClient<any>(
   supabaseUrl || 'https://mock.supabase.co',
   supabaseAnonKey || 'mock-key'
 );

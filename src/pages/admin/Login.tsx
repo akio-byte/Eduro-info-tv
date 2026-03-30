@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Label } from '../../components/ui/Label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../components/ui/Card';
+import { MonitorPlay } from 'lucide-react';
 
 export function Login() {
   const [email, setEmail] = useState('');
@@ -15,13 +16,9 @@ export function Login() {
   const navigate = useNavigate();
   const { user, isLoading } = useAuth();
 
-  useEffect(() => {
-    document.title = 'Eduro InfoTV';
-  }, []);
-
   if (isLoading) {
     return (
-      <div className="brand-admin-shell flex h-screen items-center justify-center">
+      <div className="flex h-screen items-center justify-center bg-slate-50">
         <div className="text-slate-500">Ladataan...</div>
       </div>
     );
@@ -37,6 +34,8 @@ export function Login() {
     setError(null);
 
     if (isMockSupabase) {
+      // Mock login success handled by AuthContext (it sets mock user on mount)
+      // but if we are here, it means we somehow bypassed it. Let's just navigate.
       setTimeout(() => {
         navigate('/admin');
       }, 500);
@@ -57,25 +56,28 @@ export function Login() {
   };
 
   return (
-    <div className="brand-admin-shell flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-md overflow-hidden">
-        <CardHeader className="space-y-4 border-b border-[var(--color-brand-border)] bg-[var(--color-brand-panel)]/90 text-center">
-          <div className="mx-auto inline-flex rounded-2xl bg-[var(--color-brand-surface-muted)] px-5 py-4">
-            <div className="brand-wordmark items-center">
-              <span className="brand-wordmark__eyebrow text-[var(--color-brand-primary)]">Eduro</span>
-              <span className="brand-wordmark__title text-[var(--color-brand-ink)]">InfoTV</span>
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-2 text-center">
+          <div className="flex justify-center mb-4">
+            <div className="rounded-full bg-slate-100 p-3">
+              <MonitorPlay className="h-8 w-8 text-slate-900" />
             </div>
           </div>
-          <div>
-            <CardTitle className="text-2xl">Hallintapaneeli</CardTitle>
-            <CardDescription>Kirjaudu sisään hallinnoimaan aulan näytön sisältöä.</CardDescription>
-          </div>
+          <CardTitle className="text-2xl">Eduro InfoTV</CardTitle>
+          <CardDescription>
+            Kirjaudu sisään hallintapaneeliin
+          </CardDescription>
         </CardHeader>
         <form onSubmit={handleLogin}>
-          <CardContent className="space-y-4 pt-6">
-            {error && <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+          <CardContent className="space-y-4">
+            {error && (
+              <div className="rounded-md bg-red-50 p-3 text-sm text-red-500">
+                {error}
+              </div>
+            )}
             {isMockSupabase && (
-              <div className="rounded-md bg-[var(--color-brand-surface-muted)] p-3 text-sm text-[var(--color-brand-primary)]">
+              <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-600">
                 Huom: Sovellus käyttää mock-dataa. Voit kirjautua sisään millä tahansa tunnuksilla.
               </div>
             )}
