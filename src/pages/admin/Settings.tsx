@@ -245,6 +245,17 @@ export function Settings() {
                 onCheckedChange={(checked) => setSettings({ ...settings, show_qr_links: checked })}
               />
             </div>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="showJobs">Avoimet työpaikat</Label>
+                <p className="text-sm text-slate-500">Näytä avoimet työpaikkailmoitukset</p>
+              </div>
+              <Switch
+                id="showJobs"
+                checked={settings.show_jobs || false}
+                onCheckedChange={(checked) => setSettings({ ...settings, show_jobs: checked })}
+              />
+            </div>
             <div className="pt-4 border-t border-slate-100">
               <div className="flex items-center justify-between mb-4">
                 <div className="space-y-0.5">

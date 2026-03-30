@@ -1,23 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase, isMockSupabase } from '../../lib/supabase';
-import { mockAnnouncements, mockEvents, mockHighlights, mockQrLinks, mockSettings } from '../../lib/mock-data';
+import { mockAnnouncements, mockEvents, mockHighlights, mockJobs, mockQrLinks, mockSettings } from '../../lib/mock-data';
 import type { Tables } from '../../types/database';
 import { format } from 'date-fns';
 import { fi } from 'date-fns/locale';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Clock, Calendar, MapPin, Info } from 'lucide-react';
+import { Briefcase, Clock, Calendar, ExternalLink, MapPin, Info } from 'lucide-react';
 
 type Announcement = Tables<'announcements'>;
 type Event = Tables<'events'>;
 type Highlight = Tables<'highlights'>;
+type Job = Tables<'jobs'>;
 type QrLink = Tables<'qr_links'>;
 type Settings = Tables<'display_settings'>;
 
 type ContentItem =
   | { type: 'announcement'; data: Announcement }
   | { type: 'event'; data: Event }
-  | { type: 'highlight'; data: Highlight };
+  | { type: 'highlight'; data: Highlight }
+  | { type: 'job'; data: Job };
 
 function normalizeAccentColor(value: string | null | undefined) {
   if (!value) {
@@ -58,6 +60,43 @@ function isUpcomingEvent(eventDate: string, now: Date) {
   return parseEventDate(eventDate) >= startOfToday;
 }
 
+function HighlightMedia({ highlight }: { highlight: Highlight }) {
+  const [imgError, setImgError] = useState(false);
+
+  if (highlight.video_url) {
+    return (
+      <div className="relative w-1/2 overflow-hidden">
+        <video
+          src={highlight.video_url}
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <div className="absolute inset-0 z-10 bg-gradient-to-r from-slate-900/10 to-slate-900/70" />
+      </div>
+    );
+  }
+
+  if (highlight.image_url && !imgError) {
+    return (
+      <div className="relative w-1/2">
+        <div className="absolute inset-0 z-10 bg-gradient-to-r from-slate-900/20 to-slate-900/80" />
+        <img
+          src={highlight.image_url}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+          referrerPolicy="no-referrer"
+          onError={() => setImgError(true)}
+        />
+      </div>
+    );
+  }
+
+  return null;
+}
+
 export function Display() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -65,6 +104,7 @@ export function Display() {
   const [contentQueue, setContentQueue] = useState<ContentItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const fetchedOnce = useRef(false);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -115,20 +155,31 @@ export function Display() {
           .filter((item) => item.is_published && isUpcomingEvent(item.event_date, now))
           .forEach((item) => queue.push({ type: 'event', data: item }));
       }
+      if (mockSettings.show_jobs) {
+        mockJobs
+          .filter((item) => isVisibleWindowContent(item, now))
+          .forEach((item) => queue.push({ type: 'job', data: item }));
+      }
 
       setContentQueue(queue);
-      setCurrentIndex((prev) => (queue.length === 0 ? 0 : prev % queue.length));
+      if (!fetchedOnce.current) {
+        setCurrentIndex(0);
+        fetchedOnce.current = true;
+      } else {
+        setCurrentIndex((prev) => (queue.length === 0 ? 0 : prev % queue.length));
+      }
       setLoading(false);
       return;
     }
 
     try {
-      const [settingsRes, qrRes, annRes, evRes, highRes] = await Promise.allSettled([
+      const [settingsRes, qrRes, annRes, evRes, highRes, jobsRes] = await Promise.allSettled([
         supabase.from('display_settings').select('*').limit(1).maybeSingle(),
         supabase.from('qr_links').select('*').eq('is_published', true).order('sort_order'),
         supabase.from('announcements').select('*').eq('is_published', true).order('created_at', { ascending: false }),
         supabase.from('events').select('*').eq('is_published', true).order('event_date'),
         supabase.from('highlights').select('*').eq('is_published', true).order('sort_order'),
+        supabase.from('jobs').select('*').eq('is_published', true).order('sort_order'),
       ]);
 
       const readQueryData = <T,>(
@@ -155,6 +206,7 @@ export function Display() {
       const announcementItems = readQueryData('announcements', annRes, [] as Announcement[]);
       const eventItems = readQueryData('events', evRes, [] as Event[]);
       const highlightItems = readQueryData('highlights', highRes, [] as Highlight[]);
+      const jobItems = readQueryData('jobs', jobsRes, [] as Job[]);
 
       setSettings(currentSettings);
       setQrLinks(qrItems.filter((item) => isVisibleWindowContent(item, now)));
@@ -175,9 +227,19 @@ export function Display() {
           .filter((item) => item.is_published && isUpcomingEvent(item.event_date, now))
           .forEach((item) => queue.push({ type: 'event', data: item }));
       }
+      if (currentSettings.show_jobs) {
+        jobItems
+          .filter((item) => isVisibleWindowContent(item, now))
+          .forEach((item) => queue.push({ type: 'job', data: item }));
+      }
 
       setContentQueue(queue);
-      setCurrentIndex((prev) => (queue.length === 0 ? 0 : prev % queue.length));
+      if (!fetchedOnce.current) {
+        setCurrentIndex(0);
+        fetchedOnce.current = true;
+      } else {
+        setCurrentIndex((prev) => (queue.length === 0 ? 0 : prev % queue.length));
+      }
     } catch (error) {
       console.error('Error fetching display data:', error);
       setSettings(mockSettings);
@@ -249,20 +311,10 @@ export function Display() {
                 transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
                 className="flex h-full overflow-hidden rounded-3xl border border-slate-800 bg-slate-900"
               >
-                {currentContent.data.image_url && (
-                  <div className="relative w-1/2">
-                    <div className="absolute inset-0 z-10 bg-gradient-to-r from-slate-900/20 to-slate-900/80" />
-                    <img
-                      src={currentContent.data.image_url}
-                      alt=""
-                      className="absolute inset-0 h-full w-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-                )}
+                <HighlightMedia highlight={currentContent.data} />
                 <div
                   className={`flex flex-col justify-center p-16 ${
-                    currentContent.data.image_url ? 'w-1/2' : 'w-full items-center text-center'
+                    currentContent.data.image_url || currentContent.data.video_url ? 'w-1/2' : 'w-full items-center text-center'
                   }`}
                 >
                   {currentContent.data.subtitle && (
@@ -305,7 +357,7 @@ export function Display() {
                   {currentContent.data.body}
                 </p>
               </motion.div>
-            ) : (
+            ) : currentContent.type === 'event' ? (
               <motion.div
                 key={`event-${currentContent.data.id}`}
                 initial={{ opacity: 0, y: 20 }}
@@ -353,6 +405,51 @@ export function Display() {
 
                 {currentContent.data.description && (
                   <p className="max-w-4xl text-3xl leading-relaxed text-slate-300">{currentContent.data.description}</p>
+                )}
+              </motion.div>
+            ) : (
+              <motion.div
+                key={`job-${currentContent.data.id}`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                className="relative flex h-full flex-col justify-center overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 p-16"
+              >
+                <div className="absolute left-0 top-0 h-2 w-full" style={{ backgroundColor: accentColor }} />
+                <div className="mb-8 flex items-center space-x-4">
+                  <div className="rounded-full bg-slate-800 p-4">
+                    <Briefcase className="h-10 w-10 text-slate-300" />
+                  </div>
+                  <span className="text-2xl font-medium uppercase tracking-wide text-slate-400">Avoin työpaikka</span>
+                </div>
+                <h2 className="mb-8 text-6xl font-bold leading-tight text-slate-50">{currentContent.data.title}</h2>
+
+                <div className="mb-12 flex flex-wrap gap-6">
+                  {currentContent.data.department && (
+                    <div className="flex items-center space-x-3 rounded-2xl border border-slate-800/50 bg-slate-950/50 px-8 py-5">
+                      <Briefcase className="h-8 w-8" style={{ color: accentColor }} />
+                      <span className="text-2xl font-medium text-slate-200">{currentContent.data.department}</span>
+                    </div>
+                  )}
+                  {currentContent.data.location && (
+                    <div className="flex items-center space-x-3 rounded-2xl border border-slate-800/50 bg-slate-950/50 px-8 py-5">
+                      <MapPin className="h-8 w-8" style={{ color: accentColor }} />
+                      <span className="text-2xl font-medium text-slate-200">{currentContent.data.location}</span>
+                    </div>
+                  )}
+                </div>
+
+                {currentContent.data.description && (
+                  <p className="max-w-4xl text-3xl leading-relaxed text-slate-300">{currentContent.data.description}</p>
+                )}
+
+                {currentContent.data.apply_url && (
+                  <div className="mt-12 flex items-center space-x-4">
+                    <ExternalLink className="h-8 w-8 text-slate-500" />
+                    <span className="text-xl text-slate-400">Lue lisää ja hae osoitteessa</span>
+                    <span className="text-xl font-semibold text-slate-200">{currentContent.data.apply_url}</span>
+                  </div>
                 )}
               </motion.div>
             )}

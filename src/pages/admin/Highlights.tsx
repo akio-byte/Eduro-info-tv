@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import { supabase, isMockSupabase } from '../../lib/supabase';
 import { mockHighlights } from '../../lib/mock-data';
 import type { Tables } from '../../types/database';
@@ -8,11 +8,13 @@ import { Label } from '../../components/ui/Label';
 import { Textarea } from '../../components/ui/Textarea';
 import { Switch } from '../../components/ui/Switch';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
-import { Plus, Pencil, Trash2, X, Image as ImageIcon, Upload, Calendar as CalendarIcon, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Image as ImageIcon, Upload, Calendar as CalendarIcon, ArrowUp, ArrowDown, Video } from 'lucide-react';
 import { format } from 'date-fns';
 import { fi } from 'date-fns/locale';
 
 type Highlight = Tables<'highlights'>;
+
+const MAX_IMAGE_BYTES = 2 * 1024 * 1024; // 2 MB
 
 export function Highlights() {
   const [highlights, setHighlights] = useState<Highlight[]>([]);
@@ -28,6 +30,7 @@ export function Highlights() {
   const [body, setBody] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [imagePath, setImagePath] = useState('');
+  const [videoUrl, setVideoUrl] = useState('');
   const [ctaLabel, setCtaLabel] = useState('');
   const [ctaUrl, setCtaUrl] = useState('');
   const [startAt, setStartAt] = useState('');
@@ -65,6 +68,7 @@ export function Highlights() {
     setBody('');
     setImageUrl('');
     setImagePath('');
+    setVideoUrl('');
     setCtaLabel('');
     setCtaUrl('');
     setStartAt('');
@@ -81,6 +85,7 @@ export function Highlights() {
     setBody(highlight.body || '');
     setImageUrl(highlight.image_url || '');
     setImagePath(highlight.image_path || '');
+    setVideoUrl(highlight.video_url || '');
     setCtaLabel(highlight.cta_label || '');
     setCtaUrl(highlight.cta_url || '');
     setStartAt(highlight.start_at ? highlight.start_at.substring(0, 16) : '');
@@ -91,10 +96,17 @@ export function Highlights() {
     setMessage(null);
   }
 
-  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleImageUpload(e: ChangeEvent<HTMLInputElement>) {
     if (!e.target.files || e.target.files.length === 0) return;
-    
+
     const file = e.target.files[0];
+
+    if (file.size > MAX_IMAGE_BYTES) {
+      setMessage({ type: 'error', text: `Kuva on liian suuri (${(file.size / 1024 / 1024).toFixed(1)} MB). Enimmäiskoko on 2 MB.` });
+      e.target.value = '';
+      return;
+    }
+
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
     const filePath = `${fileName}`;
@@ -145,13 +157,14 @@ export function Highlights() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setMessage(null);
-    
+
     const payload = {
       title,
       subtitle: subtitle || null,
       body: body || null,
       image_url: imageUrl || null,
       image_path: imagePath || null,
+      video_url: videoUrl || null,
       cta_label: ctaLabel || null,
       cta_url: ctaUrl || null,
       start_at: startAt ? new Date(startAt).toISOString() : null,
@@ -193,7 +206,7 @@ export function Highlights() {
       }
       setMessage({ type: 'success', text: 'Nosto luotu.' });
     }
-    
+
     resetForm();
     fetchHighlights();
   }
@@ -246,7 +259,7 @@ export function Highlights() {
     // Update sort orders in DB
     await supabase.from('highlights').update({ sort_order: swapItem.sort_order }).eq('id', currentItem.id);
     await supabase.from('highlights').update({ sort_order: currentItem.sort_order }).eq('id', swapItem.id);
-    
+
     fetchHighlights();
   }
 
@@ -319,9 +332,11 @@ export function Highlights() {
                   rows={3}
                 />
               </div>
+
+              {/* Image section */}
               <div className="space-y-4 border-t border-slate-100 pt-4">
                 <Label>Kuva</Label>
-                
+
                 {imageUrl ? (
                   <div className="relative aspect-video w-full max-w-md overflow-hidden rounded-md border border-slate-200">
                     <img src={imageUrl} alt="Preview" className="h-full w-full object-cover" />
@@ -341,14 +356,14 @@ export function Highlights() {
                       <div className="flex flex-col items-center justify-center pt-5 pb-6">
                         <Upload className="w-8 h-8 mb-4 text-slate-500" />
                         <p className="mb-2 text-sm text-slate-500"><span className="font-semibold">Klikkaa ladataksesi</span> tai raahaa kuva tähän</p>
-                        <p className="text-xs text-slate-500">PNG, JPG tai WEBP (MAX. 2MB)</p>
+                        <p className="text-xs text-slate-500">PNG, JPG tai WEBP (max. 2 Mt)</p>
                       </div>
-                      <input id="dropzone-file" type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={uploading} />
+                      <input id="dropzone-file" type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={uploading || !!videoUrl} />
                     </label>
                   </div>
                 )}
                 {uploading && <p className="text-sm text-slate-500">Ladataan kuvaa...</p>}
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="imageUrl">Tai syötä kuvan URL (valinnainen)</Label>
                   <Input
@@ -357,10 +372,28 @@ export function Highlights() {
                     value={imageUrl}
                     onChange={(e) => setImageUrl(e.target.value)}
                     placeholder="https://esimerkki.fi/kuva.jpg"
-                    disabled={!!imagePath}
+                    disabled={!!imagePath || !!videoUrl}
                   />
                 </div>
               </div>
+
+              {/* Video section */}
+              <div className="space-y-2 border-t border-slate-100 pt-4">
+                <Label htmlFor="videoUrl" className="flex items-center gap-2">
+                  <Video className="h-4 w-4" />
+                  Videosilmukka (valinnainen, korvaa kuvan)
+                </Label>
+                <Input
+                  id="videoUrl"
+                  type="url"
+                  value={videoUrl}
+                  onChange={(e) => setVideoUrl(e.target.value)}
+                  placeholder="https://esimerkki.fi/video.mp4"
+                  disabled={!!imageUrl}
+                />
+                <p className="text-xs text-slate-500">Suositellaan lyhyttä MP4-videota (max. 30 s). Video toistetaan äänettömästi silmukassa.</p>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-slate-100 pt-4">
                 <div className="space-y-2">
                   <Label htmlFor="ctaLabel">Painikkeen teksti (valinnainen)</Label>
@@ -437,7 +470,12 @@ export function Highlights() {
 
             return (
             <Card key={highlight.id} className={`overflow-hidden flex flex-col ${!isActive ? 'opacity-60' : ''}`}>
-              {highlight.image_url ? (
+              {highlight.video_url ? (
+                <div className="aspect-video w-full overflow-hidden bg-slate-900 flex items-center justify-center">
+                  <Video className="h-10 w-10 text-slate-500" />
+                  <span className="ml-3 text-sm text-slate-400">Video</span>
+                </div>
+              ) : highlight.image_url ? (
                 <div className="aspect-video w-full overflow-hidden bg-slate-100">
                   <img src={highlight.image_url} alt={highlight.title} className="h-full w-full object-cover" />
                 </div>

@@ -110,6 +110,7 @@ export type Database = {
           body: string | null
           image_url: string | null
           image_path: string | null
+          video_url: string | null
           cta_label: string | null
           cta_url: string | null
           start_at: string | null
@@ -126,6 +127,7 @@ export type Database = {
           body?: string | null
           image_url?: string | null
           image_path?: string | null
+          video_url?: string | null
           cta_label?: string | null
           cta_url?: string | null
           start_at?: string | null
@@ -142,6 +144,7 @@ export type Database = {
           body?: string | null
           image_url?: string | null
           image_path?: string | null
+          video_url?: string | null
           cta_label?: string | null
           cta_url?: string | null
           start_at?: string | null
@@ -201,6 +204,7 @@ export type Database = {
           show_highlights: boolean
           show_qr_links: boolean
           show_opening_hours: boolean
+          show_jobs: boolean
           opening_hours_text: string | null
           fallback_message: string | null
           accent_color: string
@@ -216,6 +220,7 @@ export type Database = {
           show_highlights?: boolean
           show_qr_links?: boolean
           show_opening_hours?: boolean
+          show_jobs?: boolean
           opening_hours_text?: string | null
           fallback_message?: string | null
           accent_color?: string
@@ -231,9 +236,54 @@ export type Database = {
           show_highlights?: boolean
           show_qr_links?: boolean
           show_opening_hours?: boolean
+          show_jobs?: boolean
           opening_hours_text?: string | null
           fallback_message?: string | null
           accent_color?: string
+          updated_at?: string
+        }
+      }
+      jobs: {
+        Row: {
+          id: string
+          title: string
+          department: string | null
+          location: string | null
+          description: string | null
+          apply_url: string | null
+          is_published: boolean
+          start_at: string | null
+          end_at: string | null
+          sort_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          department?: string | null
+          location?: string | null
+          description?: string | null
+          apply_url?: string | null
+          is_published?: boolean
+          start_at?: string | null
+          end_at?: string | null
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          department?: string | null
+          location?: string | null
+          description?: string | null
+          apply_url?: string | null
+          is_published?: boolean
+          start_at?: string | null
+          end_at?: string | null
+          sort_order?: number
+          created_at?: string
           updated_at?: string
         }
       }

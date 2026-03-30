@@ -62,6 +62,7 @@ export const mockHighlights: Tables['highlights']['Row'][] = [
     body: 'Tarjoamme laajan valikoiman täydennyskoulutuksia IT-alalle. Katso tarjonta ja hae mukaan.',
     image_url: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=1000',
     image_path: null,
+    video_url: null,
     cta_label: 'Lue lisää',
     cta_url: 'https://eduro.fi/koulutukset',
     start_at: null,
@@ -78,6 +79,7 @@ export const mockHighlights: Tables['highlights']['Row'][] = [
     body: 'Olemme avanneet uuden kampuksen keskustaan. Tervetuloa tutustumaan!',
     image_url: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=1000',
     image_path: null,
+    video_url: null,
     cta_label: 'Katso kuvat',
     cta_url: 'https://eduro.fi/kampus',
     start_at: null,
@@ -116,6 +118,37 @@ export const mockQrLinks: Tables['qr_links']['Row'][] = [
   }
 ];
 
+export const mockJobs: Tables['jobs']['Row'][] = [
+  {
+    id: '1',
+    title: 'IT-asiantuntija',
+    department: 'IT-palvelut',
+    location: 'Rovaniemi',
+    description: 'Haemme kokenutta IT-asiantuntijaa tukemaan organisaatiomme digitaalista kehitystä.',
+    apply_url: 'https://eduro.fi/rekrytointi',
+    is_published: true,
+    start_at: null,
+    end_at: null,
+    sort_order: 1,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: '2',
+    title: 'Kouluttaja / Opettaja',
+    department: 'Koulutus',
+    location: 'Rovaniemi / Etätyö',
+    description: 'Etsimme innostunutta kouluttajaa digitaalisten taitojen opettamiseen aikuisopiskelijoille.',
+    apply_url: 'https://eduro.fi/rekrytointi',
+    is_published: true,
+    start_at: null,
+    end_at: null,
+    sort_order: 2,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+];
+
 export const mockSettings: Tables['display_settings']['Row'] = {
   id: '1',
   org_name: 'Eduro',
@@ -126,6 +159,7 @@ export const mockSettings: Tables['display_settings']['Row'] = {
   show_highlights: true,
   show_qr_links: true,
   show_opening_hours: true,
+  show_jobs: true,
   opening_hours_text: 'Ma-Pe 08:00 - 16:00',
   fallback_message: 'Ei uusia tiedotteita tällä hetkellä. Mukavaa päivää!',
   accent_color: '#0ea5e9', // sky-500
