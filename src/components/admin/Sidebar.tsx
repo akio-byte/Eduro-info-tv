@@ -21,18 +21,19 @@ export function Sidebar() {
     navigate('/admin/login');
   };
 
-  const filteredNavigation = navigation.filter(item => 
-    role && item.roles.includes(role)
-  );
+  const filteredNavigation = navigation.filter((item) => role && item.roles.includes(role));
 
   return (
-    <div className="flex h-full w-64 flex-col border-r border-slate-200 bg-slate-50">
-      <div className="flex h-16 items-center px-6 border-b border-slate-200">
-        <MonitorPlay className="h-6 w-6 text-slate-900 mr-2" />
-        <span className="text-lg font-semibold text-slate-900">Eduro InfoTV</span>
+    <div className="brand-panel m-4 flex h-[calc(100vh-2rem)] w-72 flex-col overflow-hidden rounded-3xl bg-white/90 backdrop-blur-sm">
+      <div className="border-b border-[var(--color-brand-border)] px-6 py-6">
+        <div className="brand-wordmark">
+          <span className="brand-wordmark__eyebrow text-[var(--color-brand-primary)]">Eduro</span>
+          <span className="brand-wordmark__title text-[var(--color-brand-ink)]">InfoTV</span>
+        </div>
+        <p className="mt-3 text-sm text-[var(--color-brand-muted)]">Hallittu lobbynäytön sisältö yhdestä paikasta.</p>
       </div>
-      
-      <div className="flex-1 overflow-y-auto py-4">
+
+      <div className="flex-1 overflow-y-auto py-5">
         <nav className="space-y-1 px-3">
           {filteredNavigation.map((item) => {
             const isActive = location.pathname === item.href;
@@ -40,15 +41,15 @@ export function Sidebar() {
               <Link
                 key={item.name}
                 to={item.href}
-                className={`group flex items-center rounded-md px-3 py-2 text-sm font-medium ${
+                className={`group flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
                   isActive
-                    ? 'bg-slate-200 text-slate-900'
-                    : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                    ? 'bg-[var(--color-brand-surface-muted)] text-[var(--color-brand-primary)]'
+                    : 'text-slate-700 hover:bg-[var(--color-brand-surface)] hover:text-[var(--color-brand-ink)]'
                 }`}
               >
                 <item.icon
                   className={`mr-3 h-5 w-5 flex-shrink-0 ${
-                    isActive ? 'text-slate-900' : 'text-slate-400 group-hover:text-slate-500'
+                    isActive ? 'text-[var(--color-brand-primary)]' : 'text-slate-400 group-hover:text-[var(--color-brand-primary)]'
                   }`}
                   aria-hidden="true"
                 />
@@ -59,27 +60,27 @@ export function Sidebar() {
         </nav>
       </div>
 
-      <div className="border-t border-slate-200 p-4 space-y-2">
+      <div className="space-y-2 border-t border-[var(--color-brand-border)] p-4">
         <Link
           to="/admin/preview"
-          className="group flex w-full items-center rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+          className="group flex w-full items-center rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-[var(--color-brand-surface)] hover:text-[var(--color-brand-ink)]"
         >
-          <Eye className="mr-3 h-5 w-5 text-slate-400 group-hover:text-slate-500" />
+          <Eye className="mr-3 h-5 w-5 text-slate-400 group-hover:text-[var(--color-brand-primary)]" />
           Esikatselu
         </Link>
         <Link
           to="/display"
           target="_blank"
-          className="group flex w-full items-center rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+          className="group flex w-full items-center rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-[var(--color-brand-surface)] hover:text-[var(--color-brand-ink)]"
         >
-          <MonitorPlay className="mr-3 h-5 w-5 text-slate-400 group-hover:text-slate-500" />
+          <MonitorPlay className="mr-3 h-5 w-5 text-slate-400 group-hover:text-[var(--color-brand-primary)]" />
           Avaa näyttö
         </Link>
         <button
           onClick={handleLogout}
-          className="group flex w-full items-center rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+          className="group flex w-full items-center rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-[var(--color-brand-surface)] hover:text-[var(--color-brand-ink)]"
         >
-          <LogOut className="mr-3 h-5 w-5 text-slate-400 group-hover:text-slate-500" />
+          <LogOut className="mr-3 h-5 w-5 text-slate-400 group-hover:text-[var(--color-brand-primary)]" />
           Kirjaudu ulos
         </button>
       </div>

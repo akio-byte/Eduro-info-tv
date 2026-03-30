@@ -228,7 +228,7 @@ export function Announcements() {
                   <Label htmlFor="priority">Prioriteetti</Label>
                   <select
                     id="priority"
-                    className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2"
+                    className="flex h-10 w-full rounded-md border border-[var(--color-brand-border)] bg-white px-3 py-2 text-sm text-[var(--color-brand-ink)] ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-primary)] focus-visible:ring-offset-2"
                     value={priority}
                     onChange={(e) => setPriority(e.target.value as any)}
                   >

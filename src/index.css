@@ -1,1 +1,92 @@
 @import "tailwindcss";
+
+:root {
+  --font-brand-sans: Ubuntu, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --color-brand-primary: #253b70;
+  --color-brand-primary-strong: #1d2f5a;
+  --color-brand-primary-soft: #dfe6f3;
+  --color-brand-surface: #f3f5f8;
+  --color-brand-surface-muted: #e8edf5;
+  --color-brand-panel: #ffffff;
+  --color-brand-border: #d4dce8;
+  --color-brand-ink: #1c2740;
+  --color-brand-muted: #5f6d87;
+  --color-brand-display-bg: #111826;
+  --color-brand-display-panel: #1b2740;
+  --color-brand-display-panel-soft: #223251;
+  --shadow-brand-card: 0 18px 40px rgba(18, 32, 61, 0.08);
+  --shadow-brand-display: 0 22px 80px rgba(5, 10, 24, 0.35);
+}
+
+html {
+  background: var(--color-brand-surface);
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top right, rgba(37, 59, 112, 0.12), transparent 32%),
+    linear-gradient(180deg, #f7f9fc 0%, var(--color-brand-surface) 100%);
+  color: var(--color-brand-ink);
+  font-family: var(--font-brand-sans);
+  text-rendering: optimizeLegibility;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.brand-admin-shell {
+  background:
+    radial-gradient(circle at top left, rgba(37, 59, 112, 0.08), transparent 30%),
+    linear-gradient(180deg, #f7f9fc 0%, var(--color-brand-surface) 100%);
+}
+
+.brand-panel {
+  background: var(--color-brand-panel);
+  border: 1px solid var(--color-brand-border);
+  box-shadow: var(--shadow-brand-card);
+}
+
+.brand-display-shell {
+  background:
+    radial-gradient(circle at top left, rgba(63, 90, 156, 0.25), transparent 28%),
+    linear-gradient(180deg, #111826 0%, #0c1220 100%);
+}
+
+.brand-display-panel {
+  background: linear-gradient(180deg, rgba(35, 50, 81, 0.94) 0%, rgba(27, 39, 64, 0.98) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: var(--shadow-brand-display);
+}
+
+.brand-display-side-panel {
+  background: linear-gradient(180deg, rgba(19, 28, 46, 0.97) 0%, rgba(14, 20, 34, 1) 100%);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.brand-wordmark {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.brand-wordmark__eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+}
+
+.brand-wordmark__title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
