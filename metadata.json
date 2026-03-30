@@ -1,0 +1,5 @@
+{
+  "name": "Eduro InfoTV",
+  "description": "Digital signage and InfoTV system for Eduro with an admin interface.",
+  "requestFramePermissions": []
+}
