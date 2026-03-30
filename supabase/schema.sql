@@ -46,6 +46,7 @@ create table public.highlights (
   body text,
   image_url text,
   image_path text,
+  video_url text,
   cta_label text,
   cta_url text,
   start_at timestamp with time zone,
@@ -81,6 +82,7 @@ create table public.display_settings (
   show_highlights boolean default true not null,
   show_qr_links boolean default true not null,
   show_opening_hours boolean default true not null,
+  show_jobs boolean default false not null,
   opening_hours_text text,
   fallback_message text,
   accent_color text not null default '#0ea5e9',
@@ -98,6 +100,22 @@ values (
   '#0ea5e9'
 );
 
+-- 7. Jobs
+create table public.jobs (
+  id uuid default uuid_generate_v4() primary key,
+  title text not null,
+  department text,
+  location text,
+  description text,
+  apply_url text,
+  is_published boolean default true not null,
+  start_at timestamp with time zone,
+  end_at timestamp with time zone,
+  sort_order integer default 0 not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
 -- Row Level Security (RLS) Policies
 
 -- Enable RLS on all tables
@@ -106,6 +124,7 @@ alter table public.announcements enable row level security;
 alter table public.events enable row level security;
 alter table public.highlights enable row level security;
 alter table public.qr_links enable row level security;
+alter table public.jobs enable row level security;
 alter table public.display_settings enable row level security;
 
 -- Drop existing policies if any (for clean re-runs)
@@ -120,6 +139,9 @@ drop policy if exists "Admin full access for highlights" on public.highlights;
 drop policy if exists "Admin full access for qr_links" on public.qr_links;
 drop policy if exists "Admin full access for display_settings" on public.display_settings;
 drop policy if exists "Admin full access for profiles" on public.profiles;
+drop policy if exists "Public read access for jobs" on public.jobs;
+drop policy if exists "Auth read access for jobs" on public.jobs;
+drop policy if exists "Editor write access for jobs" on public.jobs;
 
 -- Public read access for display (only published and active content)
 create policy "Public read access for announcements" on public.announcements for select using (
@@ -137,8 +159,13 @@ create policy "Public read access for highlights" on public.highlights for selec
   (end_at is null or end_at >= now())
 );
 create policy "Public read access for qr_links" on public.qr_links for select using (
-  is_published = true and 
-  (start_at is null or start_at <= now()) and 
+  is_published = true and
+  (start_at is null or start_at <= now()) and
+  (end_at is null or end_at >= now())
+);
+create policy "Public read access for jobs" on public.jobs for select using (
+  is_published = true and
+  (start_at is null or start_at <= now()) and
   (end_at is null or end_at >= now())
 );
 create policy "Public read access for display_settings" on public.display_settings for select using (true);
@@ -148,6 +175,7 @@ create policy "Auth read access for announcements" on public.announcements for s
 create policy "Auth read access for events" on public.events for select to authenticated using (true);
 create policy "Auth read access for highlights" on public.highlights for select to authenticated using (true);
 create policy "Auth read access for qr_links" on public.qr_links for select to authenticated using (true);
+create policy "Auth read access for jobs" on public.jobs for select to authenticated using (true);
 
 -- Editor/Admin write access for content
 create policy "Editor write access for announcements" on public.announcements for all to authenticated using (
@@ -160,6 +188,9 @@ create policy "Editor write access for highlights" on public.highlights for all 
   exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'editor'))
 );
 create policy "Editor write access for qr_links" on public.qr_links for all to authenticated using (
+  exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'editor'))
+);
+create policy "Editor write access for jobs" on public.jobs for all to authenticated using (
   exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'editor'))
 );
 
@@ -188,6 +219,7 @@ create trigger handle_updated_at before update on public.events for each row exe
 create trigger handle_updated_at before update on public.highlights for each row execute procedure public.handle_updated_at();
 create trigger handle_updated_at before update on public.qr_links for each row execute procedure public.handle_updated_at();
 create trigger handle_updated_at before update on public.display_settings for each row execute procedure public.handle_updated_at();
+create trigger handle_updated_at before update on public.jobs for each row execute procedure public.handle_updated_at();
 
 -- Trigger to automatically create a profile for new users
 create or replace function public.handle_new_user()
