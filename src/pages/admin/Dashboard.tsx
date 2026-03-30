@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Megaphone, Calendar, Star, QrCode } from 'lucide-react';
 import { supabase, isMockSupabase } from '../../lib/supabase';
-import { mockAnnouncements, mockEvents, mockHighlights, mockQrLinks } from '../../lib/mock-data';
+import { mockAnnouncements, mockEvents, mockHighlights, mockQrLinks, mockSettings } from '../../lib/mock-data';
+import { DISPLAY_SETTINGS_ID } from '../../lib/display-settings';
+import { isUpcomingEvent, isVisibleWindowContent } from '../../lib/content-visibility';
 
 export function Dashboard() {
   const [stats, setStats] = useState({
@@ -15,60 +17,46 @@ export function Dashboard() {
   useEffect(() => {
     async function fetchStats() {
       if (isMockSupabase) {
-        const now = new Date();
         setStats({
-          announcements: mockAnnouncements.filter(a => {
-            if (!a.is_published) return false;
-            if (a.start_at && new Date(a.start_at) > now) return false;
-            if (a.end_at && new Date(a.end_at) < now) return false;
-            return true;
-          }).length,
-          events: mockEvents.filter(e => {
-            if (!e.is_published) return false;
-            const eventDate = new Date(e.event_date);
-            if (eventDate < new Date(now.setHours(0, 0, 0, 0))) return false;
-            return true;
-          }).length,
-          highlights: mockHighlights.filter(h => {
-            if (!h.is_published) return false;
-            if (h.start_at && new Date(h.start_at) > now) return false;
-            if (h.end_at && new Date(h.end_at) < now) return false;
-            return true;
-          }).length,
-          qrLinks: mockQrLinks.filter(q => {
-            if (!q.is_published) return false;
-            if (q.start_at && new Date(q.start_at) > now) return false;
-            if (q.end_at && new Date(q.end_at) < now) return false;
-            return true;
-          }).length,
+          announcements: mockSettings.show_announcements
+            ? mockAnnouncements.filter((item) => isVisibleWindowContent(item)).length
+            : 0,
+          events: mockSettings.show_events
+            ? mockEvents.filter((item) => item.is_published && isUpcomingEvent(item.event_date)).length
+            : 0,
+          highlights: mockSettings.show_highlights
+            ? mockHighlights.filter((item) => isVisibleWindowContent(item)).length
+            : 0,
+          qrLinks: mockSettings.show_qr_links
+            ? mockQrLinks.filter((item) => isVisibleWindowContent(item)).length
+            : 0,
         });
         return;
       }
 
-      const now = new Date().toISOString();
-      const [announcements, events, highlights, qrLinks] = await Promise.all([
-        supabase.from('announcements').select('*', { count: 'exact', head: true })
-          .eq('is_published', true)
-          .or(`start_at.is.null,start_at.lte.${now}`)
-          .or(`end_at.is.null,end_at.gte.${now}`),
-        supabase.from('events').select('*', { count: 'exact', head: true })
-          .eq('is_published', true)
-          .gte('event_date', new Date(new Date().setHours(0, 0, 0, 0)).toISOString().split('T')[0]),
-        supabase.from('highlights').select('*', { count: 'exact', head: true })
-          .eq('is_published', true)
-          .or(`start_at.is.null,start_at.lte.${now}`)
-          .or(`end_at.is.null,end_at.gte.${now}`),
-        supabase.from('qr_links').select('*', { count: 'exact', head: true })
-          .eq('is_published', true)
-          .or(`start_at.is.null,start_at.lte.${now}`)
-          .or(`end_at.is.null,end_at.gte.${now}`),
+      const [settingsRes, announcementsRes, eventsRes, highlightsRes, qrLinksRes] = await Promise.all([
+        supabase.from('display_settings').select('*').eq('id', DISPLAY_SETTINGS_ID).maybeSingle(),
+        supabase.from('announcements').select('*').order('created_at', { ascending: false }),
+        supabase.from('events').select('*').order('event_date', { ascending: true }),
+        supabase.from('highlights').select('*').order('sort_order', { ascending: true }),
+        supabase.from('qr_links').select('*').order('sort_order', { ascending: true }),
       ]);
 
+      const settings = settingsRes.data || mockSettings;
+
       setStats({
-        announcements: announcements.count || 0,
-        events: events.count || 0,
-        highlights: highlights.count || 0,
-        qrLinks: qrLinks.count || 0,
+        announcements: settings.show_announcements
+          ? (announcementsRes.data || []).filter((item) => isVisibleWindowContent(item)).length
+          : 0,
+        events: settings.show_events
+          ? (eventsRes.data || []).filter((item) => item.is_published && isUpcomingEvent(item.event_date)).length
+          : 0,
+        highlights: settings.show_highlights
+          ? (highlightsRes.data || []).filter((item) => isVisibleWindowContent(item)).length
+          : 0,
+        qrLinks: settings.show_qr_links
+          ? (qrLinksRes.data || []).filter((item) => isVisibleWindowContent(item)).length
+          : 0,
       });
     }
 
