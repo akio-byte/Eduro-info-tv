@@ -7,7 +7,7 @@ export function AdminLayout() {
 
   if (isLoading) {
     return (
-      <div className="brand-admin-shell flex h-screen items-center justify-center">
+      <div className="flex h-screen items-center justify-center bg-slate-50">
         <div className="text-slate-500">Ladataan...</div>
       </div>
     );
@@ -18,9 +18,9 @@ export function AdminLayout() {
   }
 
   return (
-    <div className="brand-admin-shell flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-white">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto p-8">
+      <main className="flex-1 overflow-y-auto bg-slate-50/50 p-8">
         <div className="mx-auto max-w-5xl">
           <Outlet />
         </div>

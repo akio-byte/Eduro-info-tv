@@ -1,16 +1,6 @@
 import type { Database } from '../types/database';
-import { EDURO_PRIMARY_BLUE } from './brand';
-import { DISPLAY_SETTINGS_ID } from './display-settings';
 
 type Tables = Database['public']['Tables'];
-
-function createDateOnly(daysFromNow: number) {
-  const date = new Date(Date.now() + daysFromNow * 86400000);
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
 export const mockAnnouncements: Tables['announcements']['Row'][] = [
   {
@@ -42,7 +32,7 @@ export const mockEvents: Tables['events']['Row'][] = [
     id: '1',
     title: 'Eduro Innovaatiopäivä',
     description: 'Tule kuulemaan alan asiantuntijoita ja verkostoitumaan.',
-    event_date: createDateOnly(2),
+    event_date: new Date(Date.now() + 86400000 * 2).toISOString(), // 2 days from now
     start_time: '10:00',
     end_time: '15:00',
     location: 'Pääauditorio',
@@ -54,7 +44,7 @@ export const mockEvents: Tables['events']['Row'][] = [
     id: '2',
     title: 'Koodauskerho kokoontuu',
     description: 'Avoin kaikille tasoille. Tällä viikolla aiheena React ja TypeScript.',
-    event_date: createDateOnly(5),
+    event_date: new Date(Date.now() + 86400000 * 5).toISOString(),
     start_time: '16:00',
     end_time: '18:00',
     location: 'Luokka B204',
@@ -96,7 +86,7 @@ export const mockHighlights: Tables['highlights']['Row'][] = [
     sort_order: 2,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-  },
+  }
 ];
 
 export const mockQrLinks: Tables['qr_links']['Row'][] = [
@@ -123,11 +113,11 @@ export const mockQrLinks: Tables['qr_links']['Row'][] = [
     sort_order: 2,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-  },
+  }
 ];
 
 export const mockSettings: Tables['display_settings']['Row'] = {
-  id: DISPLAY_SETTINGS_ID,
+  id: '1',
   org_name: 'Eduro',
   welcome_text: 'Tervetuloa Eduroon!',
   rotation_interval_seconds: 15,
@@ -138,6 +128,6 @@ export const mockSettings: Tables['display_settings']['Row'] = {
   show_opening_hours: true,
   opening_hours_text: 'Ma-Pe 08:00 - 16:00',
   fallback_message: 'Ei uusia tiedotteita tällä hetkellä. Mukavaa päivää!',
-  accent_color: EDURO_PRIMARY_BLUE,
+  accent_color: '#0ea5e9', // sky-500
   updated_at: new Date().toISOString(),
 };
