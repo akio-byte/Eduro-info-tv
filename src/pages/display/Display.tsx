@@ -87,7 +87,7 @@ export function Display() {
     }
 
     try {
-      const [settingsRes, qrRes, annRes, evRes, highRes] = await Promise.all([
+      const [settingsRes, qrRes, annRes, evRes, highRes] = await Promise.allSettled([
         supabase.from('display_settings').select('*').eq('id', DISPLAY_SETTINGS_ID).maybeSingle(),
         supabase.from('qr_links').select('*').eq('is_published', true).order('sort_order'),
         supabase.from('announcements').select('*').eq('is_published', true).order('created_at', { ascending: false }),
@@ -95,23 +95,42 @@ export function Display() {
         supabase.from('highlights').select('*').eq('is_published', true).order('sort_order'),
       ]);
 
-      const currentSettings = settingsRes.data || mockSettings;
+      const readQueryData = <T,>(label: string, result: PromiseSettledResult<{ data: T | null; error: unknown }>, fallback: T) => {
+        if (result.status === 'rejected') {
+          console.error(`Display query failed: ${label}`, result.reason);
+          return fallback;
+        }
+
+        if (result.value.error) {
+          console.error(`Display query returned an error: ${label}`, result.value.error);
+          return fallback;
+        }
+
+        return result.value.data ?? fallback;
+      };
+
+      const currentSettings = readQueryData('display_settings', settingsRes, mockSettings);
+      const qrItems = readQueryData('qr_links', qrRes, [] as QrLink[]);
+      const announcementItems = readQueryData('announcements', annRes, [] as Announcement[]);
+      const eventItems = readQueryData('events', evRes, [] as Event[]);
+      const highlightItems = readQueryData('highlights', highRes, [] as Highlight[]);
+
       setSettings(currentSettings);
-      setQrLinks((qrRes.data || []).filter((item) => isVisibleWindowContent(item)));
+      setQrLinks(qrItems.filter((item) => isVisibleWindowContent(item)));
 
       const queue: ContentItem[] = [];
       if (currentSettings.show_highlights) {
-        (highRes.data || [])
+        highlightItems
           .filter((item) => isVisibleWindowContent(item))
           .forEach((item) => queue.push({ type: 'highlight', data: item }));
       }
       if (currentSettings.show_announcements) {
-        (annRes.data || [])
+        announcementItems
           .filter((item) => isVisibleWindowContent(item))
           .forEach((item) => queue.push({ type: 'announcement', data: item }));
       }
       if (currentSettings.show_events) {
-        (evRes.data || [])
+        eventItems
           .filter((item) => item.is_published && isUpcomingEvent(item.event_date))
           .forEach((item) => queue.push({ type: 'event', data: item }));
       }
@@ -120,6 +139,10 @@ export function Display() {
       setCurrentIndex((prev) => (queue.length === 0 ? 0 : prev % queue.length));
     } catch (error) {
       console.error('Error fetching display data:', error);
+      setSettings(mockSettings);
+      setQrLinks([]);
+      setContentQueue([]);
+      setCurrentIndex(0);
     } finally {
       setLoading(false);
     }
