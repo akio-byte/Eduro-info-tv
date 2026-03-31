@@ -35,6 +35,7 @@ export type Database = {
           title: string
           body: string
           priority: 'high' | 'normal' | 'low'
+          is_pinned: boolean
           start_at: string | null
           end_at: string | null
           is_published: boolean
@@ -46,6 +47,7 @@ export type Database = {
           title: string
           body: string
           priority?: 'high' | 'normal' | 'low'
+          is_pinned?: boolean
           start_at?: string | null
           end_at?: string | null
           is_published?: boolean
@@ -57,6 +59,7 @@ export type Database = {
           title?: string
           body?: string
           priority?: 'high' | 'normal' | 'low'
+          is_pinned?: boolean
           start_at?: string | null
           end_at?: string | null
           is_published?: boolean
@@ -198,6 +201,7 @@ export type Database = {
           id: string
           org_name: string
           welcome_text: string | null
+          hero_subtitle: string | null
           rotation_interval_seconds: number
           show_announcements: boolean
           show_events: boolean
@@ -205,7 +209,13 @@ export type Database = {
           show_qr_links: boolean
           show_opening_hours: boolean
           show_jobs: boolean
+          show_rss: boolean
           opening_hours_text: string | null
+          opening_hours_mon_fri: string | null
+          opening_hours_sat: string | null
+          opening_hours_sun: string | null
+          rss_feed_url: string | null
+          rss_max_items: number
           fallback_message: string | null
           accent_color: string
           updated_at: string
@@ -214,6 +224,7 @@ export type Database = {
           id?: string
           org_name?: string
           welcome_text?: string | null
+          hero_subtitle?: string | null
           rotation_interval_seconds?: number
           show_announcements?: boolean
           show_events?: boolean
@@ -221,7 +232,13 @@ export type Database = {
           show_qr_links?: boolean
           show_opening_hours?: boolean
           show_jobs?: boolean
+          show_rss?: boolean
           opening_hours_text?: string | null
+          opening_hours_mon_fri?: string | null
+          opening_hours_sat?: string | null
+          opening_hours_sun?: string | null
+          rss_feed_url?: string | null
+          rss_max_items?: number
           fallback_message?: string | null
           accent_color?: string
           updated_at?: string
@@ -230,6 +247,7 @@ export type Database = {
           id?: string
           org_name?: string
           welcome_text?: string | null
+          hero_subtitle?: string | null
           rotation_interval_seconds?: number
           show_announcements?: boolean
           show_events?: boolean
@@ -237,7 +255,13 @@ export type Database = {
           show_qr_links?: boolean
           show_opening_hours?: boolean
           show_jobs?: boolean
+          show_rss?: boolean
           opening_hours_text?: string | null
+          opening_hours_mon_fri?: string | null
+          opening_hours_sat?: string | null
+          opening_hours_sun?: string | null
+          rss_feed_url?: string | null
+          rss_max_items?: number
           fallback_message?: string | null
           accent_color?: string
           updated_at?: string

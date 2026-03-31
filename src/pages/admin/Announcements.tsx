@@ -8,7 +8,7 @@ import { Label } from '../../components/ui/Label';
 import { Textarea } from '../../components/ui/Textarea';
 import { Switch } from '../../components/ui/Switch';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
-import { Plus, Pencil, Trash2, X, Calendar as CalendarIcon } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Calendar as CalendarIcon, Pin } from 'lucide-react';
 import { format } from 'date-fns';
 import { fi } from 'date-fns/locale';
 
@@ -26,6 +26,7 @@ export function Announcements() {
   const [body, setBody] = useState('');
   const [priority, setPriority] = useState<'high' | 'normal' | 'low'>('normal');
   const [isPublished, setIsPublished] = useState(true);
+  const [isPinned, setIsPinned] = useState(false);
   const [startAt, setStartAt] = useState('');
   const [endAt, setEndAt] = useState('');
 
@@ -59,6 +60,7 @@ export function Announcements() {
     setBody('');
     setPriority('normal');
     setIsPublished(true);
+    setIsPinned(false);
     setStartAt('');
     setEndAt('');
     setEditingId(null);
@@ -71,6 +73,7 @@ export function Announcements() {
     setBody(announcement.body || '');
     setPriority(announcement.priority || 'normal');
     setIsPublished(announcement.is_published ?? true);
+    setIsPinned(announcement.is_pinned ?? false);
     setStartAt(announcement.start_at ? announcement.start_at.substring(0, 16) : '');
     setEndAt(announcement.end_at ? announcement.end_at.substring(0, 16) : '');
     setEditingId(announcement.id);
@@ -87,6 +90,7 @@ export function Announcements() {
       body,
       priority,
       is_published: isPublished,
+      is_pinned: isPinned,
       start_at: startAt ? new Date(startAt).toISOString() : null,
       end_at: endAt ? new Date(endAt).toISOString() : null,
     };
@@ -223,14 +227,14 @@ export function Announcements() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-slate-100 pt-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-slate-100 pt-4">
                 <div className="space-y-2">
                   <Label htmlFor="priority">Prioriteetti</Label>
                   <select
                     id="priority"
                     className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2"
                     value={priority}
-                    onChange={(e) => setPriority(e.target.value as any)}
+                    onChange={(e) => setPriority(e.target.value as 'high' | 'normal' | 'low')}
                   >
                     <option value="high">Korkea</option>
                     <option value="normal">Normaali</option>
@@ -244,6 +248,17 @@ export function Announcements() {
                     onCheckedChange={setIsPublished}
                   />
                   <Label htmlFor="published">Julkaistu näytöllä</Label>
+                </div>
+                <div className="space-y-1 pt-7">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="pinned"
+                      checked={isPinned}
+                      onCheckedChange={setIsPinned}
+                    />
+                    <Label htmlFor="pinned">Kiinnitetty tiedote</Label>
+                  </div>
+                  <p className="text-xs text-slate-400">Näkyy aina sivupalkissa. Vain yksi kerrallaan.</p>
                 </div>
               </div>
               <div className="flex justify-end space-x-2 pt-4 border-t border-slate-100">
@@ -277,6 +292,11 @@ export function Announcements() {
                   <div className="space-y-1">
                     <div className="flex items-center space-x-2">
                       <h3 className="font-semibold text-slate-900">{announcement.title}</h3>
+                      {announcement.is_pinned && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                          <Pin className="h-3 w-3" />Kiinnitetty
+                        </span>
+                      )}
                       {announcement.priority === 'high' && (
                         <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-800">Tärkeä</span>
                       )}

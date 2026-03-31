@@ -163,6 +163,15 @@ export function Settings() {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="heroSubtitle">Hero-alaotsikko (näkyy tervetuloa-slidissa)</Label>
+              <Input
+                id="heroSubtitle"
+                placeholder="esim. Lapin johtava aikuiskouluttaja"
+                value={settings.hero_subtitle || ''}
+                onChange={(e) => setSettings({ ...settings, hero_subtitle: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="fallbackMessage">Varaviesti (kun ei muuta sisältöä)</Label>
               <Textarea
                 id="fallbackMessage"
@@ -245,17 +254,6 @@ export function Settings() {
                 onCheckedChange={(checked) => setSettings({ ...settings, show_qr_links: checked })}
               />
             </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="showJobs">Avoimet työpaikat</Label>
-                <p className="text-sm text-slate-500">Näytä avoimet työpaikkailmoitukset</p>
-              </div>
-              <Switch
-                id="showJobs"
-                checked={settings.show_jobs || false}
-                onCheckedChange={(checked) => setSettings({ ...settings, show_jobs: checked })}
-              />
-            </div>
             <div className="pt-4 border-t border-slate-100">
               <div className="flex items-center justify-between mb-4">
                 <div className="space-y-0.5">
@@ -269,16 +267,83 @@ export function Settings() {
                 />
               </div>
               {settings.show_opening_hours && (
-                <div className="space-y-2">
-                  <Label htmlFor="openingHoursText">Aukioloaikojen teksti</Label>
-                  <Input
-                    id="openingHoursText"
-                    value={settings.opening_hours_text || ''}
-                    onChange={(e) => setSettings({ ...settings, opening_hours_text: e.target.value })}
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="hoursMonFri">Ma–Pe</Label>
+                    <Input
+                      id="hoursMonFri"
+                      placeholder="esim. 8:00–16:00"
+                      value={settings.opening_hours_mon_fri || ''}
+                      onChange={(e) => setSettings({ ...settings, opening_hours_mon_fri: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="hoursSat">La</Label>
+                    <Input
+                      id="hoursSat"
+                      placeholder="esim. suljettu"
+                      value={settings.opening_hours_sat || ''}
+                      onChange={(e) => setSettings({ ...settings, opening_hours_sat: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="hoursSun">Su</Label>
+                    <Input
+                      id="hoursSun"
+                      placeholder="esim. suljettu"
+                      value={settings.opening_hours_sun || ''}
+                      onChange={(e) => setSettings({ ...settings, opening_hours_sun: e.target.value })}
+                    />
+                  </div>
                 </div>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>RSS-uutissyöte</CardTitle>
+            <CardDescription>Valinnainen uutissyöte näytön sisältökiertoon. Oletuksena pois päältä.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="showRss">Näytä RSS-uutiset</Label>
+                <p className="text-sm text-slate-500">Lisää ulkoinen uutissyöte sisältökiertoon</p>
+              </div>
+              <Switch
+                id="showRss"
+                checked={settings.show_rss || false}
+                onCheckedChange={(checked) => setSettings({ ...settings, show_rss: checked })}
+              />
+            </div>
+            {settings.show_rss && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-100">
+                <div className="md:col-span-2 space-y-2">
+                  <Label htmlFor="rssFeedUrl">RSS-syötteen URL</Label>
+                  <Input
+                    id="rssFeedUrl"
+                    type="url"
+                    placeholder="https://esimerkki.fi/rss.xml"
+                    value={settings.rss_feed_url || ''}
+                    onChange={(e) => setSettings({ ...settings, rss_feed_url: e.target.value })}
+                  />
+                  <p className="text-xs text-slate-400">Huom: syötteen palvelimen tulee sallia selainpyynnöt (CORS). Jos syöte ei toimi, ota yhteyttä ylläpitoon.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="rssMaxItems">Uutisia kerrallaan (max)</Label>
+                  <Input
+                    id="rssMaxItems"
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={settings.rss_max_items || 3}
+                    onChange={(e) => setSettings({ ...settings, rss_max_items: parseInt(e.target.value) || 3 })}
+                  />
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
