@@ -8,7 +8,7 @@ const navigation = [
   { name: 'Tapahtumat', href: '/admin/events', icon: Calendar, roles: ['admin', 'editor'] },
   { name: 'Nostot', href: '/admin/highlights', icon: Star, roles: ['admin', 'editor'] },
   { name: 'QR-linkit', href: '/admin/qr-links', icon: QrCode, roles: ['admin', 'editor'] },
-  { name: 'Asetukset', href: '/admin/settings', icon: Settings, roles: ['admin', 'editor'] },
+  { name: 'Asetukset', href: '/admin/settings', icon: Settings, roles: ['admin'] },
 ];
 
 export function Sidebar() {
