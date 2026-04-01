@@ -21,7 +21,9 @@ export function Sidebar() {
     navigate('/admin/login');
   };
 
-  const filteredNavigation = navigation.filter((item) => !role || item.roles.includes(role));
+  const filteredNavigation = navigation.filter(item => 
+    role && item.roles.includes(role)
+  );
 
   return (
     <div className="flex h-full w-64 flex-col border-r border-slate-200 bg-slate-50">

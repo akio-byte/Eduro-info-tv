@@ -1,9 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { Navigate } from 'react-router-dom';
 import { supabase, isMockSupabase } from '../../lib/supabase';
 import { mockSettings } from '../../lib/mock-data';
 import type { Tables } from '../../types/database';
-import { createDefaultDisplaySettings, DISPLAY_SETTINGS_ID, getErrorMessage } from '../../lib/content';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Label } from '../../components/ui/Label';
@@ -18,23 +16,21 @@ export function Settings() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const { user, role, isLoading: authLoading } = useAuth();
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const { role } = useAuth();
 
   useEffect(() => {
-    if (!user) {
+    if (role === 'admin') {
+      fetchSettings();
+    } else {
       setLoading(false);
-      return;
     }
-
-    void fetchSettings();
-  }, [user]);
+  }, [role]);
 
   async function fetchSettings() {
     setLoading(true);
-
     if (isMockSupabase) {
-      setSettings({ ...mockSettings, id: DISPLAY_SETTINGS_ID });
+      setSettings(mockSettings);
       setLoading(false);
       return;
     }
@@ -42,101 +38,88 @@ export function Settings() {
     const { data, error } = await supabase
       .from('display_settings')
       .select('*')
-      .eq('id', DISPLAY_SETTINGS_ID)
-      .maybeSingle();
+      .limit(1)
+      .single();
 
-    if (error) {
+    if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
       console.error('Error fetching settings:', error);
-      setMessage({ type: 'error', text: getErrorMessage(error, 'Asetusten lataus epäonnistui.') });
-      setSettings(createDefaultDisplaySettings());
     } else {
-      setSettings(data ?? createDefaultDisplaySettings());
+      setSettings(data || null);
     }
-
     setLoading(false);
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!settings) return;
-
+    
     setSaving(true);
     setMessage(null);
 
+    // Validate rotation interval
     if (settings.rotation_interval_seconds < 5) {
       setMessage({ type: 'error', text: 'Kierron aikavälin on oltava vähintään 5 sekuntia.' });
       setSaving(false);
       return;
     }
 
-    if (!/^#(?:[0-9a-fA-F]{3}){1,2}$/.test(settings.accent_color)) {
-      setMessage({ type: 'error', text: 'Korostusvärin on oltava kelvollinen HEX-arvo.' });
-      setSaving(false);
-      return;
-    }
-
-    if (settings.show_rss && !settings.rss_feed_url) {
-      setMessage({ type: 'error', text: 'Anna RSS-syötteen URL tai poista RSS käytöstä.' });
-      setSaving(false);
-      return;
-    }
-
-    const payload: Settings = {
-      ...settings,
-      id: DISPLAY_SETTINGS_ID,
-      show_rss: Boolean(settings.show_rss),
-      rss_max_items: Math.min(Math.max(settings.rss_max_items || 3, 1), 10),
-    };
-
     if (isMockSupabase) {
-      setSettings({ ...payload, updated_at: new Date().toISOString() });
+      setSettings({ ...settings, updated_at: new Date().toISOString() });
       setTimeout(() => {
         setSaving(false);
         setMessage({ type: 'success', text: 'Asetukset tallennettu onnistuneesti (Mock).' });
-      }, 300);
+      }, 500);
       return;
     }
 
-    const { error } = await supabase
-      .from('display_settings')
-      .upsert(payload, { onConflict: 'id' });
-
-    if (error) {
-      setMessage({ type: 'error', text: getErrorMessage(error, 'Virhe tallennettaessa asetuksia.') });
-      setSaving(false);
-      return;
+    if (settings.id) {
+      const { error } = await supabase.from('display_settings').update(settings).eq('id', settings.id);
+      if (error) {
+        setMessage({ type: 'error', text: 'Virhe tallennettaessa asetuksia.' });
+      } else {
+        setMessage({ type: 'success', text: 'Asetukset tallennettu onnistuneesti.' });
+      }
+    } else {
+      const { error } = await supabase.from('display_settings').insert(settings);
+      if (error) {
+        setMessage({ type: 'error', text: 'Virhe tallennettaessa asetuksia.' });
+      } else {
+        setMessage({ type: 'success', text: 'Asetukset tallennettu onnistuneesti.' });
+      }
     }
-
-    setMessage({ type: 'success', text: 'Asetukset tallennettu onnistuneesti.' });
+    
     setSaving(false);
-    await fetchSettings();
-  }
-
-  if (authLoading || loading) {
-    return <div className="text-slate-500">Ladataan asetuksia...</div>;
-  }
-
-  if (!user) {
-    return <Navigate to="/admin/login" replace />;
+    fetchSettings();
   }
 
   if (role !== 'admin') {
-    return <Navigate to="/admin" replace />;
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-slate-900">Ei käyttöoikeutta</h2>
+          <p className="mt-2 text-slate-500">Vain ylläpitäjät voivat muokata järjestelmän asetuksia.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return <div className="text-slate-500">Ladataan asetuksia...</div>;
   }
 
   if (!settings) {
-    return <div className="text-red-500">Asetuksia ei löytynyt.</div>;
+    return <div className="text-red-500">Asetuksia ei löytynyt. Ota yhteyttä ylläpitoon.</div>;
   }
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-slate-900">Asetukset</h1>
-        <p className="mt-2 text-slate-500">Hallitse InfoTV:n yleisiä asetuksia ja ulkoasua.</p>
+        <p className="text-slate-500 mt-2">Hallitse InfoTV:n yleisiä asetuksia ja ulkoasua.</p>
       </div>
 
       {message && (
-        <div className={`rounded-md p-4 ${message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+        <div className={`p-4 rounded-md ${message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
           {message.text}
         </div>
       )}
@@ -148,7 +131,7 @@ export function Settings() {
             <CardDescription>Perustiedot ja näytön käyttäytyminen</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="orgName">Organisaation nimi</Label>
                 <Input
@@ -166,7 +149,7 @@ export function Settings() {
                   min="5"
                   max="60"
                   value={settings.rotation_interval_seconds || 15}
-                  onChange={(e) => setSettings({ ...settings, rotation_interval_seconds: parseInt(e.target.value, 10) || 15 })}
+                  onChange={(e) => setSettings({ ...settings, rotation_interval_seconds: parseInt(e.target.value) || 15 })}
                   required
                 />
               </div>
@@ -177,15 +160,6 @@ export function Settings() {
                 id="welcomeText"
                 value={settings.welcome_text || ''}
                 onChange={(e) => setSettings({ ...settings, welcome_text: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="heroSubtitle">Hero-alaotsikko (näkyy tervetuloa-slidissa)</Label>
-              <Input
-                id="heroSubtitle"
-                placeholder="esim. Lapin johtava aikuiskouluttaja"
-                value={settings.hero_subtitle || ''}
-                onChange={(e) => setSettings({ ...settings, hero_subtitle: e.target.value })}
               />
             </div>
             <div className="space-y-2">
@@ -203,7 +177,7 @@ export function Settings() {
                 <Input
                   id="accentColor"
                   type="color"
-                  className="h-10 w-16 p-1"
+                  className="w-16 h-10 p-1"
                   value={settings.accent_color || '#0ea5e9'}
                   onChange={(e) => setSettings({ ...settings, accent_color: e.target.value })}
                   required
@@ -271,8 +245,8 @@ export function Settings() {
                 onCheckedChange={(checked) => setSettings({ ...settings, show_qr_links: checked })}
               />
             </div>
-            <div className="border-t border-slate-100 pt-4">
-              <div className="mb-4 flex items-center justify-between">
+            <div className="pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-between mb-4">
                 <div className="space-y-0.5">
                   <Label htmlFor="showOpeningHours">Aukioloajat</Label>
                   <p className="text-sm text-slate-500">Näytä aukioloajat sivupalkissa</p>
@@ -284,83 +258,16 @@ export function Settings() {
                 />
               </div>
               {settings.show_opening_hours && (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="hoursMonFri">Ma–Pe</Label>
-                    <Input
-                      id="hoursMonFri"
-                      placeholder="esim. 8:00–16:00"
-                      value={settings.opening_hours_mon_fri || ''}
-                      onChange={(e) => setSettings({ ...settings, opening_hours_mon_fri: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="hoursSat">La</Label>
-                    <Input
-                      id="hoursSat"
-                      placeholder="esim. suljettu"
-                      value={settings.opening_hours_sat || ''}
-                      onChange={(e) => setSettings({ ...settings, opening_hours_sat: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="hoursSun">Su</Label>
-                    <Input
-                      id="hoursSun"
-                      placeholder="esim. suljettu"
-                      value={settings.opening_hours_sun || ''}
-                      onChange={(e) => setSettings({ ...settings, opening_hours_sun: e.target.value })}
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="openingHoursText">Aukioloaikojen teksti</Label>
+                  <Input
+                    id="openingHoursText"
+                    value={settings.opening_hours_text || ''}
+                    onChange={(e) => setSettings({ ...settings, opening_hours_text: e.target.value })}
+                  />
                 </div>
               )}
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>RSS-uutissyöte</CardTitle>
-            <CardDescription>Valinnainen uutissyöte näytön sisältökiertoon. Oletuksena pois päältä.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="showRss">Näytä RSS-uutiset</Label>
-                <p className="text-sm text-slate-500">Lisää ulkoinen uutissyöte sisältökiertoon</p>
-              </div>
-              <Switch
-                id="showRss"
-                checked={settings.show_rss || false}
-                onCheckedChange={(checked) => setSettings({ ...settings, show_rss: checked })}
-              />
-            </div>
-            {settings.show_rss && (
-              <div className="grid grid-cols-1 gap-4 border-t border-slate-100 pt-2 md:grid-cols-3">
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="rssFeedUrl">RSS-syötteen URL</Label>
-                  <Input
-                    id="rssFeedUrl"
-                    type="url"
-                    placeholder="https://esimerkki.fi/rss.xml"
-                    value={settings.rss_feed_url || ''}
-                    onChange={(e) => setSettings({ ...settings, rss_feed_url: e.target.value })}
-                  />
-                  <p className="text-xs text-slate-400">Syötteen palvelimen tulee sallia selainpyynnöt (CORS).</p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="rssMaxItems">Uutisia kerrallaan (max)</Label>
-                  <Input
-                    id="rssMaxItems"
-                    type="number"
-                    min="1"
-                    max="10"
-                    value={settings.rss_max_items || 3}
-                    onChange={(e) => setSettings({ ...settings, rss_max_items: parseInt(e.target.value, 10) || 3 })}
-                  />
-                </div>
-              </div>
-            )}
           </CardContent>
         </Card>
 

@@ -6,7 +6,7 @@ A digital signage / InfoTV system built with React, TypeScript, Tailwind CSS, an
 
 - **Public Display View (`/display`)**: A fullscreen, auto-rotating display optimized for large TV screens.
 - **Admin Dashboard (`/admin`)**: A secure area for staff to manage content.
-- **Role-Based Access**: Supports `admin` (full access including settings) and `editor` (content management without settings access) roles.
+- **Role-Based Access**: Supports `admin` (full access including settings) and `editor` (content management only) roles.
 - **Content Types**: Announcements (with start/end dates), Events, Highlights (image cards), and QR Links.
 - **Customizable**: Change colors, rotation intervals, and toggle sections on/off.
 - **Live Preview**: Built-in preview route (`/admin/preview`) to see changes instantly.
@@ -50,8 +50,6 @@ The application is a standard Vite SPA (Single Page Application) and can be depl
 2. Set the output directory to `dist`.
 3. Ensure you add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to your deployment environment variables.
 4. **Do not** set `VITE_ENABLE_MOCK_MODE=true` in production.
-5. This repository includes `vercel.json` with SPA rewrites so `/display` and `/admin/*` deep links resolve to `index.html`.
-6. Production builds block mock mode at runtime (non-localhost) to reduce accidental misconfiguration.
 
 ## V2 Roadmap Ideas
 
