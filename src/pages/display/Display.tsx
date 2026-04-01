@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { supabase, isMockSupabase } from '../../lib/supabase';
 import { mockAnnouncements, mockEvents, mockHighlights, mockQrLinks, mockSettings } from '../../lib/mock-data';
 import type { Tables } from '../../types/database';
+import { DISPLAY_SETTINGS_ID, isUpcomingEventDate, isVisibleInWindow, parseEventDate } from '../../lib/content';
 import { format } from 'date-fns';
 import { fi } from 'date-fns/locale';
 import { QRCodeSVG } from 'qrcode.react';
@@ -32,28 +33,6 @@ type ContentItem =
 function normalizeAccentColor(value: string | null | undefined) {
   if (!value) return '#0ea5e9';
   return /^#(?:[0-9a-fA-F]{3}){1,2}$/.test(value) ? value : '#0ea5e9';
-}
-
-function isVisibleWindowContent(
-  item: { is_published: boolean; start_at: string | null; end_at: string | null },
-  now: Date,
-) {
-  if (!item.is_published) return false;
-  if (item.start_at && new Date(item.start_at) > now) return false;
-  if (item.end_at && new Date(item.end_at) < now) return false;
-  return true;
-}
-
-function parseEventDate(value: string) {
-  if (value.includes('T')) return new Date(value);
-  const [year, month, day] = value.split('-').map(Number);
-  return new Date(year, month - 1, day);
-}
-
-function isUpcomingEvent(eventDate: string, now: Date) {
-  const startOfToday = new Date(now);
-  startOfToday.setHours(0, 0, 0, 0);
-  return parseEventDate(eventDate) >= startOfToday;
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
@@ -509,10 +488,10 @@ export function Display() {
     if (isMockSupabase) {
       const now = new Date();
       setSettings(mockSettings);
-      setQrLinks(mockQrLinks.filter((item) => isVisibleWindowContent(item, now)));
+      setQrLinks(mockQrLinks.filter((item) => isVisibleInWindow(item, now)));
 
       const visibleAnnouncements = mockAnnouncements.filter((item) =>
-        isVisibleWindowContent(item, now),
+        isVisibleInWindow(item, now),
       );
       const pinned = visibleAnnouncements.find((a) => a.is_pinned) ?? null;
       setPinnedAnnouncement(pinned);
@@ -530,7 +509,7 @@ export function Display() {
 
     try {
       const [settingsRes, qrRes, annRes, evRes, highRes] = await Promise.allSettled([
-        supabase.from('display_settings').select('*').limit(1).maybeSingle(),
+        supabase.from('display_settings').select('*').eq('id', DISPLAY_SETTINGS_ID).maybeSingle(),
         supabase.from('qr_links').select('*').eq('is_published', true).order('sort_order'),
         supabase
           .from('announcements')
@@ -565,10 +544,10 @@ export function Display() {
       const highlightItems = read('highlights', highRes, [] as Highlight[]);
 
       setSettings(currentSettings);
-      setQrLinks(qrItems.filter((item) => isVisibleWindowContent(item, now)));
+      setQrLinks(qrItems.filter((item) => isVisibleInWindow(item, now)));
 
       const visibleAnnouncements = announcementItems.filter((item) =>
-        isVisibleWindowContent(item, now),
+        isVisibleInWindow(item, now),
       );
       const pinned = visibleAnnouncements.find((a) => a.is_pinned) ?? null;
       setPinnedAnnouncement(pinned);
@@ -604,7 +583,7 @@ export function Display() {
 
     if (s.show_highlights) {
       highlights
-        .filter((item) => isVisibleWindowContent(item, now))
+        .filter((item) => isVisibleInWindow(item, now))
         .forEach((item) => queue.push({ type: 'highlight', data: item }));
     }
     if (s.show_announcements) {
@@ -615,7 +594,7 @@ export function Display() {
     }
     if (s.show_events) {
       events
-        .filter((item) => item.is_published && isUpcomingEvent(item.event_date, now))
+        .filter((item) => item.is_published && isUpcomingEventDate(item.event_date, now))
         .forEach((item) => queue.push({ type: 'event', data: item }));
     }
     if (s.show_rss && rssItems.length > 0) {

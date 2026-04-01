@@ -8,7 +8,7 @@ const navigation = [
   { name: 'Tapahtumat', href: '/admin/events', icon: Calendar, roles: ['admin', 'editor'] },
   { name: 'Nostot', href: '/admin/highlights', icon: Star, roles: ['admin', 'editor'] },
   { name: 'QR-linkit', href: '/admin/qr-links', icon: QrCode, roles: ['admin', 'editor'] },
-  { name: 'Asetukset', href: '/admin/settings', icon: Settings, roles: ['admin'] },
+  { name: 'Asetukset', href: '/admin/settings', icon: Settings, roles: ['admin', 'editor'] },
 ];
 
 export function Sidebar() {
@@ -21,9 +21,7 @@ export function Sidebar() {
     navigate('/admin/login');
   };
 
-  const filteredNavigation = navigation.filter(item => 
-    role && item.roles.includes(role)
-  );
+  const filteredNavigation = navigation.filter((item) => !role || item.roles.includes(role));
 
   return (
     <div className="flex h-full w-64 flex-col border-r border-slate-200 bg-slate-50">

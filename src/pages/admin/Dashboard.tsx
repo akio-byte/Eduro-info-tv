@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Ca
 import { Megaphone, Calendar, Star, QrCode } from 'lucide-react';
 import { supabase, isMockSupabase } from '../../lib/supabase';
 import { mockAnnouncements, mockEvents, mockHighlights, mockQrLinks } from '../../lib/mock-data';
+import { isUpcomingEventDate, isVisibleInWindow } from '../../lib/content';
 
 export function Dashboard() {
   const [stats, setStats] = useState({
@@ -14,65 +15,43 @@ export function Dashboard() {
 
   useEffect(() => {
     async function fetchStats() {
+      const now = new Date();
+
       if (isMockSupabase) {
-        const now = new Date();
         setStats({
-          announcements: mockAnnouncements.filter(a => {
-            if (!a.is_published) return false;
-            if (a.start_at && new Date(a.start_at) > now) return false;
-            if (a.end_at && new Date(a.end_at) < now) return false;
-            return true;
-          }).length,
-          events: mockEvents.filter(e => {
-            if (!e.is_published) return false;
-            const eventDate = new Date(e.event_date);
-            if (eventDate < new Date(now.setHours(0, 0, 0, 0))) return false;
-            return true;
-          }).length,
-          highlights: mockHighlights.filter(h => {
-            if (!h.is_published) return false;
-            if (h.start_at && new Date(h.start_at) > now) return false;
-            if (h.end_at && new Date(h.end_at) < now) return false;
-            return true;
-          }).length,
-          qrLinks: mockQrLinks.filter(q => {
-            if (!q.is_published) return false;
-            if (q.start_at && new Date(q.start_at) > now) return false;
-            if (q.end_at && new Date(q.end_at) < now) return false;
-            return true;
-          }).length,
+          announcements: mockAnnouncements.filter((item) => isVisibleInWindow(item, now)).length,
+          events: mockEvents.filter((item) => item.is_published && isUpcomingEventDate(item.event_date, now)).length,
+          highlights: mockHighlights.filter((item) => isVisibleInWindow(item, now)).length,
+          qrLinks: mockQrLinks.filter((item) => isVisibleInWindow(item, now)).length,
         });
         return;
       }
 
-      const now = new Date().toISOString();
-      const [announcements, events, highlights, qrLinks] = await Promise.all([
-        supabase.from('announcements').select('*', { count: 'exact', head: true })
-          .eq('is_published', true)
-          .or(`start_at.is.null,start_at.lte.${now}`)
-          .or(`end_at.is.null,end_at.gte.${now}`),
-        supabase.from('events').select('*', { count: 'exact', head: true })
-          .eq('is_published', true)
-          .gte('event_date', new Date(new Date().setHours(0, 0, 0, 0)).toISOString().split('T')[0]),
-        supabase.from('highlights').select('*', { count: 'exact', head: true })
-          .eq('is_published', true)
-          .or(`start_at.is.null,start_at.lte.${now}`)
-          .or(`end_at.is.null,end_at.gte.${now}`),
-        supabase.from('qr_links').select('*', { count: 'exact', head: true })
-          .eq('is_published', true)
-          .or(`start_at.is.null,start_at.lte.${now}`)
-          .or(`end_at.is.null,end_at.gte.${now}`),
+      const [announcementsRes, eventsRes, highlightsRes, qrLinksRes] = await Promise.all([
+        supabase.from('announcements').select('id, is_published, start_at, end_at'),
+        supabase.from('events').select('id, is_published, event_date'),
+        supabase.from('highlights').select('id, is_published, start_at, end_at'),
+        supabase.from('qr_links').select('id, is_published, start_at, end_at'),
       ]);
 
+      if (announcementsRes.error || eventsRes.error || highlightsRes.error || qrLinksRes.error) {
+        console.error('Error fetching dashboard stats:', {
+          announcements: announcementsRes.error,
+          events: eventsRes.error,
+          highlights: highlightsRes.error,
+          qrLinks: qrLinksRes.error,
+        });
+      }
+
       setStats({
-        announcements: announcements.count || 0,
-        events: events.count || 0,
-        highlights: highlights.count || 0,
-        qrLinks: qrLinks.count || 0,
+        announcements: (announcementsRes.data ?? []).filter((item) => isVisibleInWindow(item, now)).length,
+        events: (eventsRes.data ?? []).filter((item) => item.is_published && isUpcomingEventDate(item.event_date, now)).length,
+        highlights: (highlightsRes.data ?? []).filter((item) => isVisibleInWindow(item, now)).length,
+        qrLinks: (qrLinksRes.data ?? []).filter((item) => isVisibleInWindow(item, now)).length,
       });
     }
 
-    fetchStats();
+    void fetchStats();
   }, []);
 
   const statCards = [

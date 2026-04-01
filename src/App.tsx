@@ -11,7 +11,6 @@ import { Dashboard } from './pages/admin/Dashboard';
 import { Announcements } from './pages/admin/Announcements';
 import { Events } from './pages/admin/Events';
 import { Highlights } from './pages/admin/Highlights';
-import { Jobs } from './pages/admin/Jobs';
 import { QrLinks } from './pages/admin/QrLinks';
 import { Settings } from './pages/admin/Settings';
 import { Preview } from './pages/admin/Preview';
@@ -32,7 +31,6 @@ export default function App() {
             <Route path="announcements" element={<Announcements />} />
             <Route path="events" element={<Events />} />
             <Route path="highlights" element={<Highlights />} />
-            <Route path="jobs" element={<Jobs />} />
             <Route path="qr-links" element={<QrLinks />} />
             <Route path="settings" element={<Settings />} />
             <Route path="preview" element={<Preview />} />

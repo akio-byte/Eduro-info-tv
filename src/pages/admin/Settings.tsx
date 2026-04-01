@@ -2,6 +2,7 @@ import { useState, useEffect, FormEvent } from 'react';
 import { supabase, isMockSupabase } from '../../lib/supabase';
 import { mockSettings } from '../../lib/mock-data';
 import type { Tables } from '../../types/database';
+import { createDefaultDisplaySettings, DISPLAY_SETTINGS_ID, getErrorMessage } from '../../lib/content';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Label } from '../../components/ui/Label';
@@ -16,21 +17,23 @@ export function Settings() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-  const { role } = useAuth();
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const { user } = useAuth();
 
   useEffect(() => {
-    if (role === 'admin') {
-      fetchSettings();
-    } else {
+    if (!user) {
       setLoading(false);
+      return;
     }
-  }, [role]);
+
+    void fetchSettings();
+  }, [user]);
 
   async function fetchSettings() {
     setLoading(true);
+
     if (isMockSupabase) {
-      setSettings(mockSettings);
+      setSettings({ ...mockSettings, id: DISPLAY_SETTINGS_ID });
       setLoading(false);
       return;
     }
@@ -38,69 +41,74 @@ export function Settings() {
     const { data, error } = await supabase
       .from('display_settings')
       .select('*')
-      .limit(1)
-      .single();
+      .eq('id', DISPLAY_SETTINGS_ID)
+      .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+    if (error) {
       console.error('Error fetching settings:', error);
+      setMessage({ type: 'error', text: getErrorMessage(error, 'Asetusten lataus epäonnistui.') });
+      setSettings(createDefaultDisplaySettings());
     } else {
-      setSettings(data || null);
+      setSettings(data ?? createDefaultDisplaySettings());
     }
+
     setLoading(false);
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!settings) return;
-    
+
     setSaving(true);
     setMessage(null);
 
-    // Validate rotation interval
     if (settings.rotation_interval_seconds < 5) {
       setMessage({ type: 'error', text: 'Kierron aikavälin on oltava vähintään 5 sekuntia.' });
       setSaving(false);
       return;
     }
 
-    if (isMockSupabase) {
-      setSettings({ ...settings, updated_at: new Date().toISOString() });
-      setTimeout(() => {
-        setSaving(false);
-        setMessage({ type: 'success', text: 'Asetukset tallennettu onnistuneesti (Mock).' });
-      }, 500);
+    if (!/^#(?:[0-9a-fA-F]{3}){1,2}$/.test(settings.accent_color)) {
+      setMessage({ type: 'error', text: 'Korostusvärin on oltava kelvollinen HEX-arvo.' });
+      setSaving(false);
       return;
     }
 
-    if (settings.id) {
-      const { error } = await supabase.from('display_settings').update(settings).eq('id', settings.id);
-      if (error) {
-        setMessage({ type: 'error', text: 'Virhe tallennettaessa asetuksia.' });
-      } else {
-        setMessage({ type: 'success', text: 'Asetukset tallennettu onnistuneesti.' });
-      }
-    } else {
-      const { error } = await supabase.from('display_settings').insert(settings);
-      if (error) {
-        setMessage({ type: 'error', text: 'Virhe tallennettaessa asetuksia.' });
-      } else {
-        setMessage({ type: 'success', text: 'Asetukset tallennettu onnistuneesti.' });
-      }
+    if (settings.show_rss && !settings.rss_feed_url) {
+      setMessage({ type: 'error', text: 'Anna RSS-syötteen URL tai poista RSS käytöstä.' });
+      setSaving(false);
+      return;
     }
-    
-    setSaving(false);
-    fetchSettings();
-  }
 
-  if (role !== 'admin') {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-slate-900">Ei käyttöoikeutta</h2>
-          <p className="mt-2 text-slate-500">Vain ylläpitäjät voivat muokata järjestelmän asetuksia.</p>
-        </div>
-      </div>
-    );
+    const payload: Settings = {
+      ...settings,
+      id: DISPLAY_SETTINGS_ID,
+      show_rss: Boolean(settings.show_rss),
+      rss_max_items: Math.min(Math.max(settings.rss_max_items || 3, 1), 10),
+    };
+
+    if (isMockSupabase) {
+      setSettings({ ...payload, updated_at: new Date().toISOString() });
+      setTimeout(() => {
+        setSaving(false);
+        setMessage({ type: 'success', text: 'Asetukset tallennettu onnistuneesti (Mock).' });
+      }, 300);
+      return;
+    }
+
+    const { error } = await supabase
+      .from('display_settings')
+      .upsert(payload, { onConflict: 'id' });
+
+    if (error) {
+      setMessage({ type: 'error', text: getErrorMessage(error, 'Virhe tallennettaessa asetuksia.') });
+      setSaving(false);
+      return;
+    }
+
+    setMessage({ type: 'success', text: 'Asetukset tallennettu onnistuneesti.' });
+    setSaving(false);
+    await fetchSettings();
   }
 
   if (loading) {
@@ -108,18 +116,18 @@ export function Settings() {
   }
 
   if (!settings) {
-    return <div className="text-red-500">Asetuksia ei löytynyt. Ota yhteyttä ylläpitoon.</div>;
+    return <div className="text-red-500">Asetuksia ei löytynyt.</div>;
   }
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-slate-900">Asetukset</h1>
-        <p className="text-slate-500 mt-2">Hallitse InfoTV:n yleisiä asetuksia ja ulkoasua.</p>
+        <p className="mt-2 text-slate-500">Hallitse InfoTV:n yleisiä asetuksia ja ulkoasua.</p>
       </div>
 
       {message && (
-        <div className={`p-4 rounded-md ${message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+        <div className={`rounded-md p-4 ${message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
           {message.text}
         </div>
       )}
@@ -131,7 +139,7 @@ export function Settings() {
             <CardDescription>Perustiedot ja näytön käyttäytyminen</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="orgName">Organisaation nimi</Label>
                 <Input
@@ -149,7 +157,7 @@ export function Settings() {
                   min="5"
                   max="60"
                   value={settings.rotation_interval_seconds || 15}
-                  onChange={(e) => setSettings({ ...settings, rotation_interval_seconds: parseInt(e.target.value) || 15 })}
+                  onChange={(e) => setSettings({ ...settings, rotation_interval_seconds: parseInt(e.target.value, 10) || 15 })}
                   required
                 />
               </div>
@@ -186,7 +194,7 @@ export function Settings() {
                 <Input
                   id="accentColor"
                   type="color"
-                  className="w-16 h-10 p-1"
+                  className="h-10 w-16 p-1"
                   value={settings.accent_color || '#0ea5e9'}
                   onChange={(e) => setSettings({ ...settings, accent_color: e.target.value })}
                   required
@@ -254,8 +262,8 @@ export function Settings() {
                 onCheckedChange={(checked) => setSettings({ ...settings, show_qr_links: checked })}
               />
             </div>
-            <div className="pt-4 border-t border-slate-100">
-              <div className="flex items-center justify-between mb-4">
+            <div className="border-t border-slate-100 pt-4">
+              <div className="mb-4 flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="showOpeningHours">Aukioloajat</Label>
                   <p className="text-sm text-slate-500">Näytä aukioloajat sivupalkissa</p>
@@ -267,7 +275,7 @@ export function Settings() {
                 />
               </div>
               {settings.show_opening_hours && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                   <div className="space-y-2">
                     <Label htmlFor="hoursMonFri">Ma–Pe</Label>
                     <Input
@@ -319,8 +327,8 @@ export function Settings() {
               />
             </div>
             {settings.show_rss && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-100">
-                <div className="md:col-span-2 space-y-2">
+              <div className="grid grid-cols-1 gap-4 border-t border-slate-100 pt-2 md:grid-cols-3">
+                <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="rssFeedUrl">RSS-syötteen URL</Label>
                   <Input
                     id="rssFeedUrl"
@@ -329,7 +337,7 @@ export function Settings() {
                     value={settings.rss_feed_url || ''}
                     onChange={(e) => setSettings({ ...settings, rss_feed_url: e.target.value })}
                   />
-                  <p className="text-xs text-slate-400">Huom: syötteen palvelimen tulee sallia selainpyynnöt (CORS). Jos syöte ei toimi, ota yhteyttä ylläpitoon.</p>
+                  <p className="text-xs text-slate-400">Syötteen palvelimen tulee sallia selainpyynnöt (CORS).</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="rssMaxItems">Uutisia kerrallaan (max)</Label>
@@ -339,7 +347,7 @@ export function Settings() {
                     min="1"
                     max="10"
                     value={settings.rss_max_items || 3}
-                    onChange={(e) => setSettings({ ...settings, rss_max_items: parseInt(e.target.value) || 3 })}
+                    onChange={(e) => setSettings({ ...settings, rss_max_items: parseInt(e.target.value, 10) || 3 })}
                   />
                 </div>
               </div>
