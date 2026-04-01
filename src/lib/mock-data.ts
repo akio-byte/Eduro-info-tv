@@ -120,37 +120,6 @@ export const mockQrLinks: Tables['qr_links']['Row'][] = [
   }
 ];
 
-export const mockJobs: Tables['jobs']['Row'][] = [
-  {
-    id: '1',
-    title: 'IT-asiantuntija',
-    department: 'IT-palvelut',
-    location: 'Rovaniemi',
-    description: 'Haemme kokenutta IT-asiantuntijaa tukemaan organisaatiomme digitaalista kehitystä.',
-    apply_url: 'https://eduro.fi/rekrytointi',
-    is_published: true,
-    start_at: null,
-    end_at: null,
-    sort_order: 1,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    title: 'Kouluttaja / Opettaja',
-    department: 'Koulutus',
-    location: 'Rovaniemi / Etätyö',
-    description: 'Etsimme innostunutta kouluttajaa digitaalisten taitojen opettamiseen aikuisopiskelijoille.',
-    apply_url: 'https://eduro.fi/rekrytointi',
-    is_published: true,
-    start_at: null,
-    end_at: null,
-    sort_order: 2,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-];
-
 export const mockSettings: Tables['display_settings']['Row'] = {
   id: '1',
   org_name: 'Eduro',

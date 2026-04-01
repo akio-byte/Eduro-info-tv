@@ -1,4 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
+import { Navigate } from 'react-router-dom';
 import { supabase, isMockSupabase } from '../../lib/supabase';
 import { mockSettings } from '../../lib/mock-data';
 import type { Tables } from '../../types/database';
@@ -18,7 +19,7 @@ export function Settings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const { user } = useAuth();
+  const { user, role, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
     if (!user) {
@@ -111,8 +112,16 @@ export function Settings() {
     await fetchSettings();
   }
 
-  if (loading) {
+  if (authLoading || loading) {
     return <div className="text-slate-500">Ladataan asetuksia...</div>;
+  }
+
+  if (!user) {
+    return <Navigate to="/admin/login" replace />;
+  }
+
+  if (role !== 'admin') {
+    return <Navigate to="/admin" replace />;
   }
 
   if (!settings) {

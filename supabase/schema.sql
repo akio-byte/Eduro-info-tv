@@ -139,6 +139,10 @@ drop policy if exists "Admin full access for highlights" on public.highlights;
 drop policy if exists "Admin full access for qr_links" on public.qr_links;
 drop policy if exists "Admin full access for display_settings" on public.display_settings;
 drop policy if exists "Admin full access for profiles" on public.profiles;
+drop policy if exists "Admins can read all profiles" on public.profiles;
+drop policy if exists "Admins can manage profiles" on public.profiles;
+drop policy if exists "Admin write access for display_settings" on public.display_settings;
+drop policy if exists "Users can read own profile" on public.profiles;
 drop policy if exists "Public read access for jobs" on public.jobs;
 drop policy if exists "Auth read access for jobs" on public.jobs;
 drop policy if exists "Editor write access for jobs" on public.jobs;
@@ -194,15 +198,37 @@ create policy "Editor write access for jobs" on public.jobs for all to authentic
   exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'editor'))
 );
 
--- Admin ONLY write access for settings and profiles
+-- Admin helpers and policies for settings/profiles
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+      from public.profiles
+     where id = auth.uid()
+       and role = 'admin'
+  );
+$$;
+
 create policy "Admin write access for display_settings" on public.display_settings for all to authenticated using (
-  exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
-);
-create policy "Admin write access for profiles" on public.profiles for all to authenticated using (
-  exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+  public.is_admin()
+) with check (
+  public.is_admin()
 );
 create policy "Users can read own profile" on public.profiles for select to authenticated using (
   id = auth.uid()
+);
+create policy "Admins can read all profiles" on public.profiles for select to authenticated using (
+  public.is_admin()
+);
+create policy "Admins can manage profiles" on public.profiles for all to authenticated using (
+  public.is_admin()
+) with check (
+  public.is_admin()
 );
 
 -- Triggers for updated_at
@@ -268,4 +294,3 @@ create policy "Editor delete access for highlight images"
     bucket_id = 'infotv-highlights' and
     exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'editor'))
   );
-
