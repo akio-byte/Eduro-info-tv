@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Ca
 import { Plus, Pencil, Trash2, X, Calendar as CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { fi } from 'date-fns/locale';
+import { AIAssistant } from '../../components/ui/AIAssistant';
 
 export function Announcements() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -214,7 +215,13 @@ export function Announcements() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="body">Sisältö</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="body">Sisältö</Label>
+                  <AIAssistant 
+                    currentText={body} 
+                    onAccept={(newText) => setBody(newText)} 
+                  />
+                </div>
                 <Textarea
                   id="body"
                   value={body}
