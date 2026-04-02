@@ -1,20 +1,16 @@
 import { useState, useEffect } from 'react';
 import { db, isMockFirebase } from '../../lib/firebase';
-import { collection, onSnapshot, query, where, orderBy, limit, doc, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, orderBy, doc, Timestamp } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-utils';
 import { mockAnnouncements, mockEvents, mockHighlights, mockQrLinks, mockSettings } from '../../lib/mock-data';
-import type { Tables } from '../../types/database';
+import type { Announcement, Event, Highlight, QrLink, DisplaySettings as Settings } from '../../types/firestore';
 import { format } from 'date-fns';
 import { fi } from 'date-fns/locale';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Clock, Calendar, MapPin, Info } from 'lucide-react';
 
-type Announcement = Tables<'announcements'>;
-type Event = Tables<'events'>;
-type Highlight = Tables<'highlights'>;
-type QrLink = Tables<'qr_links'>;
-type Settings = Tables<'display_settings'>;
+// Removed redundant type definitions as they are now imported from firestore.ts
 
 type ContentItem = 
   | { type: 'announcement'; data: Announcement }
@@ -46,8 +42,8 @@ export function Display() {
       const now = new Date();
       setQrLinks(mockQrLinks.filter(q => {
         if (!q.is_published) return false;
-        if (q.start_at && new Date(q.start_at) > now) return false;
-        if (q.end_at && new Date(q.end_at) < now) return false;
+        if (q.start_at && new Date(q.start_at as string) > now) return false;
+        if (q.end_at && new Date(q.end_at as string) < now) return false;
         return true;
       }));
       
@@ -55,16 +51,16 @@ export function Display() {
       if (mockSettings.show_highlights) {
         mockHighlights.filter(h => {
           if (!h.is_published) return false;
-          if (h.start_at && new Date(h.start_at) > now) return false;
-          if (h.end_at && new Date(h.end_at) < now) return false;
+          if (h.start_at && new Date(h.start_at as string) > now) return false;
+          if (h.end_at && new Date(h.end_at as string) < now) return false;
           return true;
         }).forEach(h => queue.push({ type: 'highlight', data: h }));
       }
       if (mockSettings.show_announcements) {
         mockAnnouncements.filter(a => {
           if (!a.is_published) return false;
-          if (a.start_at && new Date(a.start_at) > now) return false;
-          if (a.end_at && new Date(a.end_at) < now) return false;
+          if (a.start_at && new Date(a.start_at as string) > now) return false;
+          if (a.end_at && new Date(a.end_at as string) < now) return false;
           return true;
         }).forEach(a => queue.push({ type: 'announcement', data: a }));
       }
@@ -89,9 +85,15 @@ export function Display() {
     const settingsRef = doc(db, 'display_settings', 'default');
     const unsubSettings = onSnapshot(settingsRef, (doc) => {
       if (doc.exists()) {
-        setSettings({ id: doc.id, ...doc.data() } as Settings);
+        const d = doc.data();
+        setSettings({
+          id: doc.id,
+          ...d,
+          created_at: d.created_at instanceof Timestamp ? d.created_at.toDate().toISOString() : d.created_at,
+          updated_at: d.updated_at instanceof Timestamp ? d.updated_at.toDate().toISOString() : d.updated_at,
+        } as any as Settings);
       } else {
-        setSettings(mockSettings);
+        setSettings(mockSettings as any);
       }
       setLoading(false);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'display_settings/default'));
@@ -101,14 +103,21 @@ export function Display() {
     const qrQuery = query(collection(db, 'qr_links'), where('is_published', '==', true), orderBy('sort_order'));
     const unsubQr = onSnapshot(qrQuery, (snapshot) => {
       const now = new Date();
-      const links = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as QrLink))
-        .filter(q => {
-          const startAt = q.start_at ? (q.start_at as any).toDate?.() || new Date(q.start_at) : null;
-          const endAt = q.end_at ? (q.end_at as any).toDate?.() || new Date(q.end_at) : null;
-          if (startAt && startAt > now) return false;
-          if (endAt && endAt < now) return false;
-          return true;
-        });
+      const links = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          ...d,
+          start_at: d.start_at instanceof Timestamp ? d.start_at.toDate().toISOString() : d.start_at,
+          end_at: d.end_at instanceof Timestamp ? d.end_at.toDate().toISOString() : d.end_at,
+        } as QrLink;
+      }).filter(q => {
+        const startAt = q.start_at ? new Date(q.start_at as string) : null;
+        const endAt = q.end_at ? new Date(q.end_at as string) : null;
+        if (startAt && startAt > now) return false;
+        if (endAt && endAt < now) return false;
+        return true;
+      });
       setQrLinks(links);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'qr_links'));
     unsubscribers.push(unsubQr);
@@ -117,14 +126,21 @@ export function Display() {
     const annQuery = query(collection(db, 'announcements'), where('is_published', '==', true), orderBy('created_at', 'desc'));
     const unsubAnn = onSnapshot(annQuery, (snapshot) => {
       const now = new Date();
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Announcement))
-        .filter(a => {
-          const startAt = a.start_at ? (a.start_at as any).toDate?.() || new Date(a.start_at) : null;
-          const endAt = a.end_at ? (a.end_at as any).toDate?.() || new Date(a.end_at) : null;
-          if (startAt && startAt > now) return false;
-          if (endAt && endAt < now) return false;
-          return true;
-        });
+      const data = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          ...d,
+          start_at: d.start_at instanceof Timestamp ? d.start_at.toDate().toISOString() : d.start_at,
+          end_at: d.end_at instanceof Timestamp ? d.end_at.toDate().toISOString() : d.end_at,
+        } as Announcement;
+      }).filter(a => {
+        const startAt = a.start_at ? new Date(a.start_at as string) : null;
+        const endAt = a.end_at ? new Date(a.end_at as string) : null;
+        if (startAt && startAt > now) return false;
+        if (endAt && endAt < now) return false;
+        return true;
+      });
       setAnnouncements(data);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'announcements'));
     unsubscribers.push(unsubAnn);
@@ -133,12 +149,18 @@ export function Display() {
     const evQuery = query(collection(db, 'events'), where('is_published', '==', true), orderBy('event_date'));
     const unsubEv = onSnapshot(evQuery, (snapshot) => {
       const now = new Date();
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Event))
-        .filter(e => {
-          const eventDate = new Date(e.event_date);
-          if (eventDate < new Date(now.setHours(0, 0, 0, 0))) return false;
-          return true;
-        });
+      const data = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          ...d,
+          // event_date is stored as ISO string in this app's current logic
+        } as Event;
+      }).filter(e => {
+        const eventDate = new Date(e.event_date);
+        if (eventDate < new Date(now.setHours(0, 0, 0, 0))) return false;
+        return true;
+      });
       setEvents(data);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'events'));
     unsubscribers.push(unsubEv);
@@ -147,14 +169,21 @@ export function Display() {
     const highQuery = query(collection(db, 'highlights'), where('is_published', '==', true), orderBy('sort_order'));
     const unsubHigh = onSnapshot(highQuery, (snapshot) => {
       const now = new Date();
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Highlight))
-        .filter(h => {
-          const startAt = h.start_at ? (h.start_at as any).toDate?.() || new Date(h.start_at) : null;
-          const endAt = h.end_at ? (h.end_at as any).toDate?.() || new Date(h.end_at) : null;
-          if (startAt && startAt > now) return false;
-          if (endAt && endAt < now) return false;
-          return true;
-        });
+      const data = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          ...d,
+          start_at: d.start_at instanceof Timestamp ? d.start_at.toDate().toISOString() : d.start_at,
+          end_at: d.end_at instanceof Timestamp ? d.end_at.toDate().toISOString() : d.end_at,
+        } as Highlight;
+      }).filter(h => {
+        const startAt = h.start_at ? new Date(h.start_at as string) : null;
+        const endAt = h.end_at ? new Date(h.end_at as string) : null;
+        if (startAt && startAt > now) return false;
+        if (endAt && endAt < now) return false;
+        return true;
+      });
       setHighlights(data);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'highlights'));
     unsubscribers.push(unsubHigh);

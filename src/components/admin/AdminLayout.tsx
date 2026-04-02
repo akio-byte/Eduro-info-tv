@@ -3,7 +3,7 @@ import { Sidebar } from './Sidebar';
 import { useAuth } from '../../contexts/AuthContext';
 
 export function AdminLayout() {
-  const { user, isLoading } = useAuth();
+  const { user, role, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -14,6 +14,11 @@ export function AdminLayout() {
   }
 
   if (!user) {
+    return <Navigate to="/admin/login" replace />;
+  }
+
+  // Prevent access if no role is assigned (e.g. profile creation failed or unauthorized)
+  if (!role) {
     return <Navigate to="/admin/login" replace />;
   }
 

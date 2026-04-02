@@ -1,8 +1,6 @@
-import type { Database } from '../types/database';
+import type { Announcement, Event, Highlight, QrLink, DisplaySettings } from '../types/firestore';
 
-type Tables = Database['public']['Tables'];
-
-export const mockAnnouncements: Tables['announcements']['Row'][] = [
+export const mockAnnouncements: Announcement[] = [
   {
     id: '1',
     title: 'Tervetuloa uuteen lukukauteen!',
@@ -27,7 +25,7 @@ export const mockAnnouncements: Tables['announcements']['Row'][] = [
   },
 ];
 
-export const mockEvents: Tables['events']['Row'][] = [
+export const mockEvents: Event[] = [
   {
     id: '1',
     title: 'Eduro Innovaatiopäivä',
@@ -54,7 +52,7 @@ export const mockEvents: Tables['events']['Row'][] = [
   },
 ];
 
-export const mockHighlights: Tables['highlights']['Row'][] = [
+export const mockHighlights: Highlight[] = [
   {
     id: '1',
     title: 'Hae nyt syksyn koulutuksiin',
@@ -89,7 +87,7 @@ export const mockHighlights: Tables['highlights']['Row'][] = [
   }
 ];
 
-export const mockQrLinks: Tables['qr_links']['Row'][] = [
+export const mockQrLinks: QrLink[] = [
   {
     id: '1',
     title: 'Lounaslista',
@@ -116,7 +114,7 @@ export const mockQrLinks: Tables['qr_links']['Row'][] = [
   }
 ];
 
-export const mockSettings: Tables['display_settings']['Row'] = {
+export const mockSettings: DisplaySettings = {
   id: '1',
   org_name: 'Eduro',
   welcome_text: 'Tervetuloa Eduroon!',

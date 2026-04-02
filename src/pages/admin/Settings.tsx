@@ -1,9 +1,9 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { db, isMockFirebase } from '../../lib/firebase';
-import { collection, onSnapshot, query, limit, updateDoc, doc, setDoc, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, query, limit, updateDoc, doc, setDoc, getDocs, Timestamp } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-utils';
 import { mockSettings } from '../../lib/mock-data';
-import type { Tables } from '../../types/database';
+import type { DisplaySettings } from '../../types/firestore';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Label } from '../../components/ui/Label';
@@ -12,7 +12,7 @@ import { Switch } from '../../components/ui/Switch';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
 import { useAuth } from '../../contexts/AuthContext';
 
-type Settings = Tables<'display_settings'>;
+type Settings = DisplaySettings;
 
 export function Settings() {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -37,7 +37,13 @@ export function Settings() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       if (!snapshot.empty) {
         const doc = snapshot.docs[0];
-        setSettings({ id: doc.id, ...doc.data() } as Settings);
+        const d = doc.data();
+        setSettings({
+          id: doc.id,
+          ...d,
+          created_at: d.created_at instanceof Timestamp ? d.created_at.toDate().toISOString() : d.created_at,
+          updated_at: d.updated_at instanceof Timestamp ? d.updated_at.toDate().toISOString() : d.updated_at,
+        } as any as Settings);
       } else {
         setSettings(null);
       }

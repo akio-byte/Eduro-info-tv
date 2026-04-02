@@ -1,13 +1,12 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { auth, db, isMockFirebase } from '../lib/firebase';
 import { onAuthStateChanged, signOut as firebaseSignOut, User } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-
-type Role = 'admin' | 'editor' | null;
+import { doc, getDoc, setDoc, serverTimestamp, collection, query, limit, getDocs } from 'firebase/firestore';
+import type { UserRole } from '../types/firestore';
 
 interface AuthContextType {
   user: User | null;
-  role: Role;
+  role: UserRole | null;
   isLoading: boolean;
   signOut: () => Promise<void>;
 }
@@ -21,7 +20,7 @@ const AuthContext = createContext<AuthContextType>({
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<Role>(null);
+  const [role, setRole] = useState<UserRole | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -38,20 +37,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userDoc = await getDoc(userDocRef);
         
         if (userDoc.exists()) {
-          setRole(userDoc.data().role as Role);
+          setRole(userDoc.data().role as UserRole);
         } else {
-          // Create profile for new user
-          const defaultRole = firebaseUser.email === 'aki.oksala@gmail.com' ? 'admin' : 'editor';
+          // Check if this is the first user in the system
+          const usersRef = collection(db, 'users');
+          const q = query(usersRef, limit(1));
+          const snapshot = await getDocs(q);
+          
+          let defaultRole: UserRole = 'editor';
+          
+          // If no users exist, the first one becomes admin
+          if (snapshot.empty) {
+            defaultRole = 'admin';
+          } else {
+            // Check for initial admin email from environment
+            const initialAdminEmail = import.meta.env.VITE_INITIAL_ADMIN_EMAIL;
+            if (initialAdminEmail && firebaseUser.email === initialAdminEmail) {
+              defaultRole = 'admin';
+            }
+          }
+
           await setDoc(userDocRef, {
             email: firebaseUser.email,
             role: defaultRole,
-            created_at: serverTimestamp()
+            created_at: serverTimestamp(),
+            updated_at: serverTimestamp()
           });
           setRole(defaultRole);
         }
       } catch (err) {
         console.error('Error fetching profile:', err);
-        setRole('editor'); // Fallback
+        // Don't set a default role on error to prevent unauthorized access
+        setRole(null);
       }
     };
 

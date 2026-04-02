@@ -1,9 +1,9 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { db, isMockFirebase } from '../../lib/firebase';
-import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-utils';
 import { mockAnnouncements } from '../../lib/mock-data';
-import type { Tables } from '../../types/database';
+import type { Announcement } from '../../types/firestore';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Label } from '../../components/ui/Label';
@@ -13,8 +13,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Ca
 import { Plus, Pencil, Trash2, X, Calendar as CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { fi } from 'date-fns/locale';
-
-type Announcement = Tables<'announcements'>;
 
 export function Announcements() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -45,11 +43,11 @@ export function Announcements() {
         return {
           id: doc.id,
           ...d,
-          // Convert Firestore Timestamps to ISO strings for compatibility with existing UI
-          created_at: d.created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
-          updated_at: d.updated_at?.toDate?.()?.toISOString() || new Date().toISOString(),
-          start_at: d.start_at?.toDate?.()?.toISOString() || d.start_at || null,
-          end_at: d.end_at?.toDate?.()?.toISOString() || d.end_at || null,
+          // Handle Firestore Timestamps consistently
+          created_at: d.created_at instanceof Timestamp ? d.created_at.toDate().toISOString() : d.created_at,
+          updated_at: d.updated_at instanceof Timestamp ? d.updated_at.toDate().toISOString() : d.updated_at,
+          start_at: d.start_at instanceof Timestamp ? d.start_at.toDate().toISOString() : d.start_at,
+          end_at: d.end_at instanceof Timestamp ? d.end_at.toDate().toISOString() : d.end_at,
         } as Announcement;
       });
       setAnnouncements(data);
@@ -76,8 +74,8 @@ export function Announcements() {
     setBody(announcement.body || '');
     setPriority(announcement.priority || 'normal');
     setIsPublished(announcement.is_published ?? true);
-    setStartAt(announcement.start_at ? announcement.start_at.substring(0, 16) : '');
-    setEndAt(announcement.end_at ? announcement.end_at.substring(0, 16) : '');
+    setStartAt(announcement.start_at ? (announcement.start_at as string).substring(0, 16) : '');
+    setEndAt(announcement.end_at ? (announcement.end_at as string).substring(0, 16) : '');
     setEditingId(announcement.id);
     setIsFormOpen(true);
     setMessage(null);

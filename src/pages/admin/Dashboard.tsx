@@ -20,8 +20,8 @@ export function Dashboard() {
         setStats({
           announcements: mockAnnouncements.filter(a => {
             if (!a.is_published) return false;
-            if (a.start_at && new Date(a.start_at) > now) return false;
-            if (a.end_at && new Date(a.end_at) < now) return false;
+            if (a.start_at && new Date(a.start_at as string) > now) return false;
+            if (a.end_at && new Date(a.end_at as string) < now) return false;
             return true;
           }).length,
           events: mockEvents.filter(e => {
@@ -32,14 +32,14 @@ export function Dashboard() {
           }).length,
           highlights: mockHighlights.filter(h => {
             if (!h.is_published) return false;
-            if (h.start_at && new Date(h.start_at) > now) return false;
-            if (h.end_at && new Date(h.end_at) < now) return false;
+            if (h.start_at && new Date(h.start_at as string) > now) return false;
+            if (h.end_at && new Date(h.end_at as string) < now) return false;
             return true;
           }).length,
           qrLinks: mockQrLinks.filter(q => {
             if (!q.is_published) return false;
-            if (q.start_at && new Date(q.start_at) > now) return false;
-            if (q.end_at && new Date(q.end_at) < now) return false;
+            if (q.start_at && new Date(q.start_at as string) > now) return false;
+            if (q.end_at && new Date(q.end_at as string) < now) return false;
             return true;
           }).length,
         });

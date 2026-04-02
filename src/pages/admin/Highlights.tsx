@@ -1,10 +1,10 @@
 import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import { db, storage, isMockFirebase } from '../../lib/firebase';
-import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-utils';
 import { mockHighlights } from '../../lib/mock-data';
-import type { Tables } from '../../types/database';
+import type { Highlight } from '../../types/firestore';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Label } from '../../components/ui/Label';
@@ -14,8 +14,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Ca
 import { Plus, Pencil, Trash2, X, Image as ImageIcon, Upload, Calendar as CalendarIcon, ArrowUp, ArrowDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { fi } from 'date-fns/locale';
-
-type Highlight = Tables<'highlights'>;
 
 export function Highlights() {
   const [highlights, setHighlights] = useState<Highlight[]>([]);
@@ -51,10 +49,10 @@ export function Highlights() {
         return {
           id: doc.id,
           ...d,
-          created_at: d.created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
-          updated_at: d.updated_at?.toDate?.()?.toISOString() || new Date().toISOString(),
-          start_at: d.start_at?.toDate?.()?.toISOString() || d.start_at || null,
-          end_at: d.end_at?.toDate?.()?.toISOString() || d.end_at || null,
+          created_at: d.created_at instanceof Timestamp ? d.created_at.toDate().toISOString() : d.created_at,
+          updated_at: d.updated_at instanceof Timestamp ? d.updated_at.toDate().toISOString() : d.updated_at,
+          start_at: d.start_at instanceof Timestamp ? d.start_at.toDate().toISOString() : d.start_at,
+          end_at: d.end_at instanceof Timestamp ? d.end_at.toDate().toISOString() : d.end_at,
         } as Highlight;
       });
       setHighlights(data);
@@ -88,8 +86,8 @@ export function Highlights() {
     setImagePath(highlight.image_path || '');
     setCtaLabel(highlight.cta_label || '');
     setCtaUrl(highlight.cta_url || '');
-    setStartAt(highlight.start_at ? highlight.start_at.substring(0, 16) : '');
-    setEndAt(highlight.end_at ? highlight.end_at.substring(0, 16) : '');
+    setStartAt(highlight.start_at ? (highlight.start_at as string).substring(0, 16) : '');
+    setEndAt(highlight.end_at ? (highlight.end_at as string).substring(0, 16) : '');
     setIsPublished(highlight.is_published ?? true);
     setEditingId(highlight.id);
     setIsFormOpen(true);

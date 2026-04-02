@@ -99,15 +99,13 @@ service cloud.firestore {
     
     function isAdmin() {
       return isAuthenticated() && (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-        (request.auth.token.email == "aki.oksala@gmail.com" && request.auth.token.email_verified == true)
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
       );
     }
     
     function isEditor() {
       return isAuthenticated() && (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'editor'] ||
-        isAdmin()
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'editor']
       );
     }
     
@@ -185,9 +183,23 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(userId) || isAdmin());
-      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (isAdmin() || (isOwner(userId) && request.resource.data.role == resource.data.role));
-      allow delete: if isAdmin();
+      
+      // Allow creation if user is authenticated and creating their own profile
+      // The first user bootstrap is handled in AuthContext, but rules must allow it.
+      // We allow 'admin' role only if no users exist yet (bootstrap) or if the creator is already an admin.
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && (
+        request.resource.data.role == 'editor' || 
+        !exists(/databases/$(database)/documents/users/$(request.auth.uid)) ||
+        isAdmin()
+      );
+      
+      // Only admins can update roles. Users can update their own profile but not their role.
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (
+        isAdmin() || (isOwner(userId) && request.resource.data.role == resource.data.role)
+      );
+      
+      // Only admins can delete users, and they cannot delete themselves.
+      allow delete: if isAdmin() && userId != request.auth.uid;
     }
 
     match /announcements/{announcementId} {

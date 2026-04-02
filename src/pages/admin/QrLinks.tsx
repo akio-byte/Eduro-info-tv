@@ -1,9 +1,9 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { db, isMockFirebase } from '../../lib/firebase';
-import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-utils';
 import { mockQrLinks } from '../../lib/mock-data';
-import type { Tables } from '../../types/database';
+import type { QrLink } from '../../types/firestore';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Label } from '../../components/ui/Label';
@@ -14,8 +14,6 @@ import { Plus, Pencil, Trash2, X, Link as LinkIcon, Calendar as CalendarIcon, Ar
 import { QRCodeSVG } from 'qrcode.react';
 import { format } from 'date-fns';
 import { fi } from 'date-fns/locale';
-
-type QrLink = Tables<'qr_links'>;
 
 export function QrLinks() {
   const [qrLinks, setQrLinks] = useState<QrLink[]>([]);
@@ -46,10 +44,10 @@ export function QrLinks() {
         return {
           id: doc.id,
           ...d,
-          created_at: d.created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
-          updated_at: d.updated_at?.toDate?.()?.toISOString() || new Date().toISOString(),
-          start_at: d.start_at?.toDate?.()?.toISOString() || d.start_at || null,
-          end_at: d.end_at?.toDate?.()?.toISOString() || d.end_at || null,
+          created_at: d.created_at instanceof Timestamp ? d.created_at.toDate().toISOString() : d.created_at,
+          updated_at: d.updated_at instanceof Timestamp ? d.updated_at.toDate().toISOString() : d.updated_at,
+          start_at: d.start_at instanceof Timestamp ? d.start_at.toDate().toISOString() : d.start_at,
+          end_at: d.end_at instanceof Timestamp ? d.end_at.toDate().toISOString() : d.end_at,
         } as QrLink;
       });
       setQrLinks(data);
@@ -75,8 +73,8 @@ export function QrLinks() {
     setTitle(qrLink.title || '');
     setUrl(qrLink.url || '');
     setDescription(qrLink.description || '');
-    setStartAt(qrLink.start_at ? qrLink.start_at.substring(0, 16) : '');
-    setEndAt(qrLink.end_at ? qrLink.end_at.substring(0, 16) : '');
+    setStartAt(qrLink.start_at ? (qrLink.start_at as string).substring(0, 16) : '');
+    setEndAt(qrLink.end_at ? (qrLink.end_at as string).substring(0, 16) : '');
     setIsPublished(qrLink.is_published ?? true);
     setEditingId(qrLink.id);
     setIsFormOpen(true);

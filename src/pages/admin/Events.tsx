@@ -1,9 +1,9 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { db, isMockFirebase } from '../../lib/firebase';
-import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-utils';
 import { mockEvents } from '../../lib/mock-data';
-import type { Tables } from '../../types/database';
+import type { Event } from '../../types/firestore';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Label } from '../../components/ui/Label';
@@ -13,8 +13,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Ca
 import { Plus, Pencil, Trash2, X, MapPin, Clock, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { fi } from 'date-fns/locale';
-
-type Event = Tables<'events'>;
 
 export function Events() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -46,8 +44,8 @@ export function Events() {
         return {
           id: doc.id,
           ...d,
-          created_at: d.created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
-          updated_at: d.updated_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+          created_at: d.created_at instanceof Timestamp ? d.created_at.toDate().toISOString() : d.created_at,
+          updated_at: d.updated_at instanceof Timestamp ? d.updated_at.toDate().toISOString() : d.updated_at,
         } as Event;
       });
       setEvents(data);
