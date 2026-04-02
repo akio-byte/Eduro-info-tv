@@ -1,5 +1,8 @@
-import { useState, useEffect, FormEvent } from 'react';
-import { supabase, isMockSupabase } from '../../lib/supabase';
+import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
+import { db, storage, isMockFirebase } from '../../lib/firebase';
+import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { handleFirestoreError, OperationType } from '../../lib/firestore-utils';
 import { mockHighlights } from '../../lib/mock-data';
 import type { Tables } from '../../types/database';
 import { Button } from '../../components/ui/Button';
@@ -35,29 +38,31 @@ export function Highlights() {
   const [isPublished, setIsPublished] = useState(true);
 
   useEffect(() => {
-    fetchHighlights();
-  }, []);
-
-  async function fetchHighlights() {
-    setLoading(true);
-    if (isMockSupabase) {
+    if (isMockFirebase) {
       setHighlights(mockHighlights);
       setLoading(false);
       return;
     }
 
-    const { data, error } = await supabase
-      .from('highlights')
-      .select('*')
-      .order('sort_order', { ascending: true });
+    const q = query(collection(db, 'highlights'), orderBy('sort_order', 'asc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          ...d,
+          created_at: d.created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+          updated_at: d.updated_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+          start_at: d.start_at?.toDate?.()?.toISOString() || d.start_at || null,
+          end_at: d.end_at?.toDate?.()?.toISOString() || d.end_at || null,
+        } as Highlight;
+      });
+      setHighlights(data);
+      setLoading(false);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'highlights'));
 
-    if (error) {
-      console.error('Error fetching highlights:', error);
-    } else {
-      setHighlights(data || []);
-    }
-    setLoading(false);
-  }
+    return () => unsubscribe();
+  }, []);
 
   function resetForm() {
     setTitle('');
@@ -91,18 +96,18 @@ export function Highlights() {
     setMessage(null);
   }
 
-  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleImageUpload(e: ChangeEvent<HTMLInputElement>) {
     if (!e.target.files || e.target.files.length === 0) return;
     
     const file = e.target.files[0];
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
-    const filePath = `${fileName}`;
+    const filePath = `highlights/${fileName}`;
 
     setUploading(true);
     setMessage(null);
 
-    if (isMockSupabase) {
+    if (isMockFirebase) {
       // Mock upload
       setTimeout(() => {
         setImageUrl(URL.createObjectURL(file));
@@ -113,30 +118,30 @@ export function Highlights() {
       return;
     }
 
-    const { error: uploadError } = await supabase.storage
-      .from('infotv-highlights')
-      .upload(filePath, file);
+    try {
+      const storageRef = ref(storage, filePath);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
 
-    if (uploadError) {
-      console.error('Error uploading image:', uploadError);
+      setImageUrl(url);
+      setImagePath(filePath);
+      setUploading(false);
+      setMessage({ type: 'success', text: 'Kuva ladattu onnistuneesti.' });
+    } catch (error) {
+      console.error('Error uploading image:', error);
       setMessage({ type: 'error', text: 'Kuvan lataus epäonnistui.' });
       setUploading(false);
-      return;
     }
-
-    const { data } = supabase.storage
-      .from('infotv-highlights')
-      .getPublicUrl(filePath);
-
-    setImageUrl(data.publicUrl);
-    setImagePath(filePath);
-    setUploading(false);
-    setMessage({ type: 'success', text: 'Kuva ladattu onnistuneesti.' });
   }
 
   async function removeImage() {
-    if (imagePath && !isMockSupabase) {
-      await supabase.storage.from('infotv-highlights').remove([imagePath]);
+    if (imagePath && !isMockFirebase) {
+      try {
+        const storageRef = ref(storage, imagePath);
+        await deleteObject(storageRef);
+      } catch (error) {
+        console.error('Error removing image from storage:', error);
+      }
     }
     setImageUrl('');
     setImagePath('');
@@ -159,7 +164,7 @@ export function Highlights() {
       is_published: isPublished,
     };
 
-    if (isMockSupabase) {
+    if (isMockFirebase) {
       if (editingId) {
         setHighlights(prev => prev.map(h => h.id === editingId ? { ...h, ...payload, updated_at: new Date().toISOString() } : h));
         setMessage({ type: 'success', text: 'Nosto päivitetty (Mock).' });
@@ -170,7 +175,7 @@ export function Highlights() {
           sort_order: highlights.length + 1,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        };
+        } as Highlight;
         setHighlights([...highlights, newHighlight]);
         setMessage({ type: 'success', text: 'Nosto luotu (Mock).' });
       }
@@ -178,47 +183,56 @@ export function Highlights() {
       return;
     }
 
-    if (editingId) {
-      const { error } = await supabase.from('highlights').update(payload).eq('id', editingId);
-      if (error) {
-        setMessage({ type: 'error', text: 'Noston päivitys epäonnistui.' });
-        return;
+    try {
+      const data = {
+        ...payload,
+        updated_at: serverTimestamp(),
+      };
+
+      if (editingId) {
+        await updateDoc(doc(db, 'highlights', editingId), data);
+        setMessage({ type: 'success', text: 'Nosto päivitetty.' });
+      } else {
+        await addDoc(collection(db, 'highlights'), {
+          ...data,
+          sort_order: highlights.length + 1,
+          created_at: serverTimestamp(),
+        });
+        setMessage({ type: 'success', text: 'Nosto luotu.' });
       }
-      setMessage({ type: 'success', text: 'Nosto päivitetty.' });
-    } else {
-      const { error } = await supabase.from('highlights').insert({ ...payload, sort_order: highlights.length + 1 });
-      if (error) {
-        setMessage({ type: 'error', text: 'Noston luonti epäonnistui.' });
-        return;
-      }
-      setMessage({ type: 'success', text: 'Nosto luotu.' });
+      resetForm();
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Noston tallennus epäonnistui.' });
+      handleFirestoreError(error, editingId ? OperationType.UPDATE : OperationType.CREATE, 'highlights');
     }
-    
-    resetForm();
-    fetchHighlights();
   }
 
   async function handleDelete(id: string) {
     if (!confirm('Haluatko varmasti poistaa tämän noston?')) return;
 
-    if (isMockSupabase) {
+    if (isMockFirebase) {
       setHighlights(prev => prev.filter(h => h.id !== id));
       setMessage({ type: 'success', text: 'Nosto poistettu (Mock).' });
       return;
     }
 
-    // Also delete image if exists
-    const highlight = highlights.find(h => h.id === id);
-    if (highlight?.image_path) {
-      await supabase.storage.from('infotv-highlights').remove([highlight.image_path]);
-    }
+    try {
+      // Also delete image if exists
+      const highlight = highlights.find(h => h.id === id);
+      if (highlight?.image_path) {
+        try {
+          const storageRef = ref(storage, highlight.image_path);
+          await deleteObject(storageRef);
+        } catch (storageErr) {
+          console.error('Error deleting image from storage:', storageErr);
+        }
+      }
 
-    const { error } = await supabase.from('highlights').delete().eq('id', id);
-    if (error) {
-      setMessage({ type: 'error', text: 'Noston poisto epäonnistui.' });
-    } else {
+      await deleteDoc(doc(db, 'highlights', id));
       setMessage({ type: 'success', text: 'Nosto poistettu.' });
-      fetchHighlights();
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Noston poisto epäonnistui.' });
+      handleFirestoreError(error, OperationType.DELETE, `highlights/${id}`);
     }
   }
 
@@ -235,7 +249,7 @@ export function Highlights() {
     const currentItem = highlights[currentIndex];
     const swapItem = highlights[newIndex];
 
-    if (isMockSupabase) {
+    if (isMockFirebase) {
       const newHighlights = [...highlights];
       newHighlights[currentIndex] = { ...swapItem, sort_order: currentItem.sort_order };
       newHighlights[newIndex] = { ...currentItem, sort_order: swapItem.sort_order };
@@ -243,21 +257,30 @@ export function Highlights() {
       return;
     }
 
-    // Update sort orders in DB
-    await supabase.from('highlights').update({ sort_order: swapItem.sort_order }).eq('id', currentItem.id);
-    await supabase.from('highlights').update({ sort_order: currentItem.sort_order }).eq('id', swapItem.id);
-    
-    fetchHighlights();
+    try {
+      await Promise.all([
+        updateDoc(doc(db, 'highlights', currentItem.id), { sort_order: swapItem.sort_order }),
+        updateDoc(doc(db, 'highlights', swapItem.id), { sort_order: currentItem.sort_order }),
+      ]);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'highlights');
+    }
   }
 
   async function togglePublish(id: string, currentStatus: boolean) {
-    if (isMockSupabase) {
+    if (isMockFirebase) {
       setHighlights(prev => prev.map(h => h.id === id ? { ...h, is_published: !currentStatus } : h));
       return;
     }
 
-    await supabase.from('highlights').update({ is_published: !currentStatus }).eq('id', id);
-    fetchHighlights();
+    try {
+      await updateDoc(doc(db, 'highlights', id), {
+        is_published: !currentStatus,
+        updated_at: serverTimestamp(),
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `highlights/${id}`);
+    }
   }
 
   return (

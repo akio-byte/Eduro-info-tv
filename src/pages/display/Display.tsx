@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { supabase, isMockSupabase } from '../../lib/supabase';
+import { db, isMockFirebase } from '../../lib/firebase';
+import { collection, onSnapshot, query, where, orderBy, limit, doc, getDoc } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../../lib/firestore-utils';
 import { mockAnnouncements, mockEvents, mockHighlights, mockQrLinks, mockSettings } from '../../lib/mock-data';
 import type { Tables } from '../../types/database';
 import { format } from 'date-fns';
@@ -26,6 +28,9 @@ export function Display() {
   const [contentQueue, setContentQueue] = useState<ContentItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [highlights, setHighlights] = useState<Highlight[]>([]);
 
   // Update time every second
   useEffect(() => {
@@ -33,28 +38,9 @@ export function Display() {
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch data initially and set up polling
+  // Fetch data initially and set up real-time listeners
   useEffect(() => {
-    fetchData();
-    // Poll for new data every 5 minutes
-    const pollTimer = setInterval(fetchData, 5 * 60 * 1000);
-    return () => clearInterval(pollTimer);
-  }, []);
-
-  // Handle content rotation
-  useEffect(() => {
-    if (contentQueue.length <= 1 || !settings) return;
-
-    const interval = (settings.rotation_interval_seconds || 15) * 1000;
-    const rotationTimer = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % contentQueue.length);
-    }, interval);
-
-    return () => clearInterval(rotationTimer);
-  }, [contentQueue.length, settings?.rotation_interval_seconds]);
-
-  async function fetchData() {
-    if (isMockSupabase) {
+    if (isMockFirebase) {
       setSettings(mockSettings);
       
       const now = new Date();
@@ -75,7 +61,6 @@ export function Display() {
         }).forEach(h => queue.push({ type: 'highlight', data: h }));
       }
       if (mockSettings.show_announcements) {
-        const now = new Date();
         mockAnnouncements.filter(a => {
           if (!a.is_published) return false;
           if (a.start_at && new Date(a.start_at) > now) return false;
@@ -97,55 +82,116 @@ export function Display() {
       return;
     }
 
-    try {
-      const [settingsRes, qrRes, annRes, evRes, highRes] = await Promise.all([
-        supabase.from('display_settings').select('*').limit(1).single(),
-        supabase.from('qr_links').select('*').eq('is_published', true).order('sort_order'),
-        supabase.from('announcements').select('*').eq('is_published', true).order('created_at', { ascending: false }),
-        supabase.from('events').select('*').eq('is_published', true).gte('event_date', new Date().toISOString().split('T')[0]).order('event_date'),
-        supabase.from('highlights').select('*').eq('is_published', true).order('sort_order'),
-      ]);
+    // Real-time listeners for Firebase
+    const unsubscribers: (() => void)[] = [];
 
-      const currentSettings = settingsRes.data || mockSettings;
-      setSettings(currentSettings);
-      
-      const now = new Date();
-      setQrLinks((qrRes.data || []).filter(q => {
-        if (!q.is_published) return false;
-        if (q.start_at && new Date(q.start_at) > now) return false;
-        if (q.end_at && new Date(q.end_at) < now) return false;
-        return true;
-      }));
-
-      const queue: ContentItem[] = [];
-      if (currentSettings.show_highlights && highRes.data) {
-        highRes.data.filter(h => {
-          if (!h.is_published) return false;
-          if (h.start_at && new Date(h.start_at) > now) return false;
-          if (h.end_at && new Date(h.end_at) < now) return false;
-          return true;
-        }).forEach(h => queue.push({ type: 'highlight', data: h }));
+    // Settings
+    const settingsRef = doc(db, 'display_settings', 'default');
+    const unsubSettings = onSnapshot(settingsRef, (doc) => {
+      if (doc.exists()) {
+        setSettings({ id: doc.id, ...doc.data() } as Settings);
+      } else {
+        setSettings(mockSettings);
       }
-      if (currentSettings.show_announcements && annRes.data) {
-        const now = new Date();
-        annRes.data.filter(a => {
-          if (!a.is_published) return false;
-          if (a.start_at && new Date(a.start_at) > now) return false;
-          if (a.end_at && new Date(a.end_at) < now) return false;
-          return true;
-        }).forEach(a => queue.push({ type: 'announcement', data: a }));
-      }
-      if (currentSettings.show_events && evRes.data) {
-        evRes.data.forEach(e => queue.push({ type: 'event', data: e }));
-      }
-
-      setContentQueue(queue);
-    } catch (error) {
-      console.error('Error fetching display data:', error);
-    } finally {
       setLoading(false);
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'display_settings/default'));
+    unsubscribers.push(unsubSettings);
+
+    // QR Links
+    const qrQuery = query(collection(db, 'qr_links'), where('is_published', '==', true), orderBy('sort_order'));
+    const unsubQr = onSnapshot(qrQuery, (snapshot) => {
+      const now = new Date();
+      const links = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as QrLink))
+        .filter(q => {
+          const startAt = q.start_at ? (q.start_at as any).toDate?.() || new Date(q.start_at) : null;
+          const endAt = q.end_at ? (q.end_at as any).toDate?.() || new Date(q.end_at) : null;
+          if (startAt && startAt > now) return false;
+          if (endAt && endAt < now) return false;
+          return true;
+        });
+      setQrLinks(links);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'qr_links'));
+    unsubscribers.push(unsubQr);
+
+    // Announcements
+    const annQuery = query(collection(db, 'announcements'), where('is_published', '==', true), orderBy('created_at', 'desc'));
+    const unsubAnn = onSnapshot(annQuery, (snapshot) => {
+      const now = new Date();
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Announcement))
+        .filter(a => {
+          const startAt = a.start_at ? (a.start_at as any).toDate?.() || new Date(a.start_at) : null;
+          const endAt = a.end_at ? (a.end_at as any).toDate?.() || new Date(a.end_at) : null;
+          if (startAt && startAt > now) return false;
+          if (endAt && endAt < now) return false;
+          return true;
+        });
+      setAnnouncements(data);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'announcements'));
+    unsubscribers.push(unsubAnn);
+
+    // Events
+    const evQuery = query(collection(db, 'events'), where('is_published', '==', true), orderBy('event_date'));
+    const unsubEv = onSnapshot(evQuery, (snapshot) => {
+      const now = new Date();
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Event))
+        .filter(e => {
+          const eventDate = new Date(e.event_date);
+          if (eventDate < new Date(now.setHours(0, 0, 0, 0))) return false;
+          return true;
+        });
+      setEvents(data);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'events'));
+    unsubscribers.push(unsubEv);
+
+    // Highlights
+    const highQuery = query(collection(db, 'highlights'), where('is_published', '==', true), orderBy('sort_order'));
+    const unsubHigh = onSnapshot(highQuery, (snapshot) => {
+      const now = new Date();
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Highlight))
+        .filter(h => {
+          const startAt = h.start_at ? (h.start_at as any).toDate?.() || new Date(h.start_at) : null;
+          const endAt = h.end_at ? (h.end_at as any).toDate?.() || new Date(h.end_at) : null;
+          if (startAt && startAt > now) return false;
+          if (endAt && endAt < now) return false;
+          return true;
+        });
+      setHighlights(data);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'highlights'));
+    unsubscribers.push(unsubHigh);
+
+    return () => unsubscribers.forEach(unsub => unsub());
+  }, []);
+
+  // Combined effect to update the content queue when any of the data sources change
+  useEffect(() => {
+    if (!settings) return;
+    
+    const queue: ContentItem[] = [];
+    if (settings.show_highlights) {
+      highlights.forEach(h => queue.push({ type: 'highlight', data: h }));
     }
-  }
+    if (settings.show_announcements) {
+      announcements.forEach(a => queue.push({ type: 'announcement', data: a }));
+    }
+    if (settings.show_events) {
+      events.forEach(e => queue.push({ type: 'event', data: e }));
+    }
+    
+    setContentQueue(queue);
+    setCurrentIndex(0); // Reset to start when queue changes
+  }, [announcements, events, highlights, settings]);
+
+  // Handle content rotation
+  useEffect(() => {
+    if (contentQueue.length <= 1 || !settings) return;
+
+    const interval = (settings.rotation_interval_seconds || 15) * 1000;
+    const rotationTimer = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % contentQueue.length);
+    }, interval);
+
+    return () => clearInterval(rotationTimer);
+  }, [contentQueue.length, settings?.rotation_interval_seconds]);
 
   if (loading || !settings) {
     return (

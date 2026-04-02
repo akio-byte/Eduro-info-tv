@@ -1,5 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { supabase, isMockSupabase } from '../../lib/supabase';
+import { db, isMockFirebase } from '../../lib/firebase';
+import { collection, onSnapshot, query, limit, updateDoc, doc, setDoc, getDocs } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../../lib/firestore-utils';
 import { mockSettings } from '../../lib/mock-data';
 import type { Tables } from '../../types/database';
 import { Button } from '../../components/ui/Button';
@@ -20,34 +22,30 @@ export function Settings() {
   const { role } = useAuth();
 
   useEffect(() => {
-    if (role === 'admin') {
-      fetchSettings();
-    } else {
+    if (role !== 'admin') {
       setLoading(false);
+      return;
     }
-  }, [role]);
 
-  async function fetchSettings() {
-    setLoading(true);
-    if (isMockSupabase) {
+    if (isMockFirebase) {
       setSettings(mockSettings);
       setLoading(false);
       return;
     }
 
-    const { data, error } = await supabase
-      .from('display_settings')
-      .select('*')
-      .limit(1)
-      .single();
+    const q = query(collection(db, 'display_settings'), limit(1));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const doc = snapshot.docs[0];
+        setSettings({ id: doc.id, ...doc.data() } as Settings);
+      } else {
+        setSettings(null);
+      }
+      setLoading(false);
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'display_settings'));
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
-      console.error('Error fetching settings:', error);
-    } else {
-      setSettings(data || null);
-    }
-    setLoading(false);
-  }
+    return () => unsubscribe();
+  }, [role]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -63,7 +61,7 @@ export function Settings() {
       return;
     }
 
-    if (isMockSupabase) {
+    if (isMockFirebase) {
       setSettings({ ...settings, updated_at: new Date().toISOString() });
       setTimeout(() => {
         setSaving(false);
@@ -72,24 +70,37 @@ export function Settings() {
       return;
     }
 
-    if (settings.id) {
-      const { error } = await supabase.from('display_settings').update(settings).eq('id', settings.id);
-      if (error) {
-        setMessage({ type: 'error', text: 'Virhe tallennettaessa asetuksia.' });
+    try {
+      const { id, ...data } = settings;
+      if (id) {
+        await updateDoc(doc(db, 'display_settings', id), {
+          ...data,
+          updated_at: new Date().toISOString(),
+        });
       } else {
-        setMessage({ type: 'success', text: 'Asetukset tallennettu onnistuneesti.' });
+        // If no settings exist, create them
+        const querySnapshot = await getDocs(collection(db, 'display_settings'));
+        if (querySnapshot.empty) {
+          await setDoc(doc(collection(db, 'display_settings')), {
+            ...data,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+        } else {
+          const existingDoc = querySnapshot.docs[0];
+          await updateDoc(doc(db, 'display_settings', existingDoc.id), {
+            ...data,
+            updated_at: new Date().toISOString(),
+          });
+        }
       }
-    } else {
-      const { error } = await supabase.from('display_settings').insert(settings);
-      if (error) {
-        setMessage({ type: 'error', text: 'Virhe tallennettaessa asetuksia.' });
-      } else {
-        setMessage({ type: 'success', text: 'Asetukset tallennettu onnistuneesti.' });
-      }
+      setMessage({ type: 'success', text: 'Asetukset tallennettu onnistuneesti.' });
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Virhe tallennettaessa asetuksia.' });
+      handleFirestoreError(error, OperationType.UPDATE, 'display_settings');
+    } finally {
+      setSaving(false);
     }
-    
-    setSaving(false);
-    fetchSettings();
   }
 
   if (role !== 'admin') {

@@ -1,0 +1,132 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile information and roles",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["admin", "editor"] },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "role"]
+    },
+    "Announcement": {
+      "title": "Announcement",
+      "description": "Public announcements for the InfoTV",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "priority": { "type": "string", "enum": ["high", "normal", "low"] },
+        "start_at": { "type": "string", "format": "date-time" },
+        "end_at": { "type": "string", "format": "date-time" },
+        "is_published": { "type": "boolean" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "body", "priority", "is_published"]
+    },
+    "Event": {
+      "title": "Event",
+      "description": "Upcoming events for the InfoTV",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "event_date": { "type": "string", "format": "date" },
+        "start_time": { "type": "string" },
+        "end_time": { "type": "string" },
+        "location": { "type": "string" },
+        "is_published": { "type": "boolean" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "event_date", "is_published"]
+    },
+    "Highlight": {
+      "title": "Highlight",
+      "description": "Visual highlights and campaigns",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "body": { "type": "string" },
+        "image_url": { "type": "string", "format": "uri" },
+        "image_path": { "type": "string" },
+        "cta_label": { "type": "string" },
+        "cta_url": { "type": "string", "format": "uri" },
+        "start_at": { "type": "string", "format": "date-time" },
+        "end_at": { "type": "string", "format": "date-time" },
+        "is_published": { "type": "boolean" },
+        "sort_order": { "type": "integer" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "is_published", "sort_order"]
+    },
+    "QrLink": {
+      "title": "QrLink",
+      "description": "Quick links with QR codes",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "url": { "type": "string", "format": "uri" },
+        "description": { "type": "string" },
+        "start_at": { "type": "string", "format": "date-time" },
+        "end_at": { "type": "string", "format": "date-time" },
+        "is_published": { "type": "boolean" },
+        "sort_order": { "type": "integer" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "url", "is_published", "sort_order"]
+    },
+    "DisplaySettings": {
+      "title": "DisplaySettings",
+      "description": "Global settings for the InfoTV display",
+      "type": "object",
+      "properties": {
+        "org_name": { "type": "string" },
+        "welcome_text": { "type": "string" },
+        "rotation_interval_seconds": { "type": "integer" },
+        "show_announcements": { "type": "boolean" },
+        "show_events": { "type": "boolean" },
+        "show_highlights": { "type": "boolean" },
+        "show_qr_links": { "type": "boolean" },
+        "show_opening_hours": { "type": "boolean" },
+        "opening_hours_text": { "type": "string" },
+        "fallback_message": { "type": "string" },
+        "accent_color": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["org_name", "rotation_interval_seconds", "accent_color"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profiles and roles"
+    },
+    "/announcements/{announcementId}": {
+      "schema": "Announcement",
+      "description": "Public announcements"
+    },
+    "/events/{eventId}": {
+      "schema": "Event",
+      "description": "Upcoming events"
+    },
+    "/highlights/{highlightId}": {
+      "schema": "Highlight",
+      "description": "Visual highlights"
+    },
+    "/qr_links/{qrLinkId}": {
+      "schema": "QrLink",
+      "description": "Quick links"
+    },
+    "/display_settings/{settingsId}": {
+      "schema": "DisplaySettings",
+      "description": "Global display settings"
+    }
+  }
+}

@@ -1,6 +1,7 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, FormEvent } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
-import { supabase, isMockSupabase } from '../../lib/supabase';
+import { auth, isMockFirebase } from '../../lib/firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -33,25 +34,20 @@ export function Login() {
     setLoading(true);
     setError(null);
 
-    if (isMockSupabase) {
-      // Mock login success handled by AuthContext (it sets mock user on mount)
-      // but if we are here, it means we somehow bypassed it. Let's just navigate.
+    if (isMockFirebase) {
+      // Mock login success is handled by AuthContext
       setTimeout(() => {
         navigate('/admin');
       }, 500);
       return;
     }
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-    } else {
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
       navigate('/admin');
+    } catch (err: any) {
+      setError(err.message || 'Kirjautuminen epäonnistui.');
+      setLoading(false);
     }
   };
 
@@ -76,7 +72,7 @@ export function Login() {
                 {error}
               </div>
             )}
-            {isMockSupabase && (
+            {isMockFirebase && (
               <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-600">
                 Huom: Sovellus käyttää mock-dataa. Voit kirjautua sisään millä tahansa tunnuksilla.
               </div>

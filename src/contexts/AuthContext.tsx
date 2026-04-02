@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { supabase, isMockSupabase } from '../lib/supabase';
-import type { User } from '@supabase/supabase-js';
+import { auth, db, isMockFirebase } from '../lib/firebase';
+import { onAuthStateChanged, signOut as firebaseSignOut, User } from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 type Role = 'admin' | 'editor' | null;
 
@@ -24,53 +25,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (isMockSupabase) {
-      setUser({ id: 'mock-user', email: 'admin@eduro.fi' } as User);
+    if (isMockFirebase) {
+      setUser({ uid: 'mock-user', email: 'admin@eduro.fi', displayName: 'Mock Admin' } as any);
       setRole('admin');
       setIsLoading(false);
       return;
     }
 
-    const fetchProfile = async (userId: string) => {
+    const fetchProfile = async (firebaseUser: User) => {
       try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', userId)
-          .single();
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const userDoc = await getDoc(userDocRef);
         
-        if (error) {
-          console.error('Error fetching profile:', error);
-          setRole('editor'); // Fallback to least privileged
-        } else if (data) {
-          setRole(data.role as Role);
+        if (userDoc.exists()) {
+          setRole(userDoc.data().role as Role);
+        } else {
+          // Create profile for new user
+          const defaultRole = firebaseUser.email === 'aki.oksala@gmail.com' ? 'admin' : 'editor';
+          await setDoc(userDocRef, {
+            email: firebaseUser.email,
+            role: defaultRole,
+            created_at: serverTimestamp()
+          });
+          setRole(defaultRole);
         }
       } catch (err) {
-        console.error('Unexpected error fetching profile:', err);
-        setRole('editor');
+        console.error('Error fetching profile:', err);
+        setRole('editor'); // Fallback
       }
     };
 
-    const initAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          setUser(session.user);
-          await fetchProfile(session.user.id);
-        }
-      } catch (err) {
-        console.error('Auth init error:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user) {
-        setUser(session.user);
-        await fetchProfile(session.user.id);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        setUser(firebaseUser);
+        await fetchProfile(firebaseUser);
       } else {
         setUser(null);
         setRole(null);
@@ -78,12 +66,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => unsubscribe();
   }, []);
 
   const signOut = async () => {
-    if (!isMockSupabase) {
-      await supabase.auth.signOut();
+    if (!isMockFirebase) {
+      await firebaseSignOut(auth);
     }
     setUser(null);
     setRole(null);

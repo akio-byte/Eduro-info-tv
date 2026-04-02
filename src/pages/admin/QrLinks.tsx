@@ -1,5 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { supabase, isMockSupabase } from '../../lib/supabase';
+import { db, isMockFirebase } from '../../lib/firebase';
+import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../../lib/firestore-utils';
 import { mockQrLinks } from '../../lib/mock-data';
 import type { Tables } from '../../types/database';
 import { Button } from '../../components/ui/Button';
@@ -31,29 +33,31 @@ export function QrLinks() {
   const [isPublished, setIsPublished] = useState(true);
 
   useEffect(() => {
-    fetchQrLinks();
-  }, []);
-
-  async function fetchQrLinks() {
-    setLoading(true);
-    if (isMockSupabase) {
+    if (isMockFirebase) {
       setQrLinks(mockQrLinks);
       setLoading(false);
       return;
     }
 
-    const { data, error } = await supabase
-      .from('qr_links')
-      .select('*')
-      .order('sort_order', { ascending: true });
+    const q = query(collection(db, 'qr_links'), orderBy('sort_order', 'asc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          ...d,
+          created_at: d.created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+          updated_at: d.updated_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+          start_at: d.start_at?.toDate?.()?.toISOString() || d.start_at || null,
+          end_at: d.end_at?.toDate?.()?.toISOString() || d.end_at || null,
+        } as QrLink;
+      });
+      setQrLinks(data);
+      setLoading(false);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'qr_links'));
 
-    if (error) {
-      console.error('Error fetching QR links:', error);
-    } else {
-      setQrLinks(data || []);
-    }
-    setLoading(false);
-  }
+    return () => unsubscribe();
+  }, []);
 
   function resetForm() {
     setTitle('');
@@ -92,7 +96,7 @@ export function QrLinks() {
       is_published: isPublished,
     };
 
-    if (isMockSupabase) {
+    if (isMockFirebase) {
       if (editingId) {
         setQrLinks(prev => prev.map(q => q.id === editingId ? { ...q, ...payload, updated_at: new Date().toISOString() } : q));
         setMessage({ type: 'success', text: 'Linkki päivitetty (Mock).' });
@@ -103,7 +107,7 @@ export function QrLinks() {
           sort_order: qrLinks.length + 1,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        };
+        } as QrLink;
         setQrLinks([...qrLinks, newQrLink]);
         setMessage({ type: 'success', text: 'Linkki luotu (Mock).' });
       }
@@ -111,41 +115,45 @@ export function QrLinks() {
       return;
     }
 
-    if (editingId) {
-      const { error } = await supabase.from('qr_links').update(payload).eq('id', editingId);
-      if (error) {
-        setMessage({ type: 'error', text: 'Linkin päivitys epäonnistui.' });
-        return;
+    try {
+      const data = {
+        ...payload,
+        updated_at: serverTimestamp(),
+      };
+
+      if (editingId) {
+        await updateDoc(doc(db, 'qr_links', editingId), data);
+        setMessage({ type: 'success', text: 'Linkki päivitetty.' });
+      } else {
+        await addDoc(collection(db, 'qr_links'), {
+          ...data,
+          sort_order: qrLinks.length + 1,
+          created_at: serverTimestamp(),
+        });
+        setMessage({ type: 'success', text: 'Linkki luotu.' });
       }
-      setMessage({ type: 'success', text: 'Linkki päivitetty.' });
-    } else {
-      const { error } = await supabase.from('qr_links').insert({ ...payload, sort_order: qrLinks.length + 1 });
-      if (error) {
-        setMessage({ type: 'error', text: 'Linkin luonti epäonnistui.' });
-        return;
-      }
-      setMessage({ type: 'success', text: 'Linkki luotu.' });
+      resetForm();
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Linkin tallennus epäonnistui.' });
+      handleFirestoreError(error, editingId ? OperationType.UPDATE : OperationType.CREATE, 'qr_links');
     }
-    
-    resetForm();
-    fetchQrLinks();
   }
 
   async function handleDelete(id: string) {
     if (!confirm('Haluatko varmasti poistaa tämän QR-linkin?')) return;
 
-    if (isMockSupabase) {
+    if (isMockFirebase) {
       setQrLinks(prev => prev.filter(q => q.id !== id));
       setMessage({ type: 'success', text: 'Linkki poistettu (Mock).' });
       return;
     }
 
-    const { error } = await supabase.from('qr_links').delete().eq('id', id);
-    if (error) {
-      setMessage({ type: 'error', text: 'Linkin poisto epäonnistui.' });
-    } else {
+    try {
+      await deleteDoc(doc(db, 'qr_links', id));
       setMessage({ type: 'success', text: 'Linkki poistettu.' });
-      fetchQrLinks();
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Linkin poisto epäonnistui.' });
+      handleFirestoreError(error, OperationType.DELETE, `qr_links/${id}`);
     }
   }
 
@@ -162,7 +170,7 @@ export function QrLinks() {
     const currentItem = qrLinks[currentIndex];
     const swapItem = qrLinks[newIndex];
 
-    if (isMockSupabase) {
+    if (isMockFirebase) {
       const newQrLinks = [...qrLinks];
       newQrLinks[currentIndex] = { ...swapItem, sort_order: currentItem.sort_order };
       newQrLinks[newIndex] = { ...currentItem, sort_order: swapItem.sort_order };
@@ -170,21 +178,30 @@ export function QrLinks() {
       return;
     }
 
-    // Update sort orders in DB
-    await supabase.from('qr_links').update({ sort_order: swapItem.sort_order }).eq('id', currentItem.id);
-    await supabase.from('qr_links').update({ sort_order: currentItem.sort_order }).eq('id', swapItem.id);
-    
-    fetchQrLinks();
+    try {
+      await Promise.all([
+        updateDoc(doc(db, 'qr_links', currentItem.id), { sort_order: swapItem.sort_order }),
+        updateDoc(doc(db, 'qr_links', swapItem.id), { sort_order: currentItem.sort_order }),
+      ]);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'qr_links');
+    }
   }
 
   async function togglePublish(id: string, currentStatus: boolean) {
-    if (isMockSupabase) {
+    if (isMockFirebase) {
       setQrLinks(prev => prev.map(q => q.id === id ? { ...q, is_published: !currentStatus } : q));
       return;
     }
 
-    await supabase.from('qr_links').update({ is_published: !currentStatus }).eq('id', id);
-    fetchQrLinks();
+    try {
+      await updateDoc(doc(db, 'qr_links', id), {
+        is_published: !currentStatus,
+        updated_at: serverTimestamp(),
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `qr_links/${id}`);
+    }
   }
 
   return (

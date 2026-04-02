@@ -1,5 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { supabase, isMockSupabase } from '../../lib/supabase';
+import { db, isMockFirebase } from '../../lib/firebase';
+import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../../lib/firestore-utils';
 import { mockAnnouncements } from '../../lib/mock-data';
 import type { Tables } from '../../types/database';
 import { Button } from '../../components/ui/Button';
@@ -30,29 +32,32 @@ export function Announcements() {
   const [endAt, setEndAt] = useState('');
 
   useEffect(() => {
-    fetchAnnouncements();
-  }, []);
-
-  async function fetchAnnouncements() {
-    setLoading(true);
-    if (isMockSupabase) {
+    if (isMockFirebase) {
       setAnnouncements(mockAnnouncements);
       setLoading(false);
       return;
     }
 
-    const { data, error } = await supabase
-      .from('announcements')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const q = query(collection(db, 'announcements'), orderBy('created_at', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          ...d,
+          // Convert Firestore Timestamps to ISO strings for compatibility with existing UI
+          created_at: d.created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+          updated_at: d.updated_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+          start_at: d.start_at?.toDate?.()?.toISOString() || d.start_at || null,
+          end_at: d.end_at?.toDate?.()?.toISOString() || d.end_at || null,
+        } as Announcement;
+      });
+      setAnnouncements(data);
+      setLoading(false);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'announcements'));
 
-    if (error) {
-      console.error('Error fetching announcements:', error);
-    } else {
-      setAnnouncements(data || []);
-    }
-    setLoading(false);
-  }
+    return () => unsubscribe();
+  }, []);
 
   function resetForm() {
     setTitle('');
@@ -91,7 +96,7 @@ export function Announcements() {
       end_at: endAt ? new Date(endAt).toISOString() : null,
     };
 
-    if (isMockSupabase) {
+    if (isMockFirebase) {
       if (editingId) {
         setAnnouncements(prev => prev.map(a => a.id === editingId ? { ...a, ...payload, updated_at: new Date().toISOString() } : a));
       } else {
@@ -100,7 +105,7 @@ export function Announcements() {
           id: Math.random().toString(),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        };
+        } as Announcement;
         setAnnouncements([newAnnouncement, ...announcements]);
       }
       resetForm();
@@ -108,44 +113,61 @@ export function Announcements() {
       return;
     }
 
-    if (editingId) {
-      const { error } = await supabase.from('announcements').update(payload).eq('id', editingId);
-      if (error) setMessage({ type: 'error', text: 'Virhe tallennettaessa tiedotetta.' });
-      else setMessage({ type: 'success', text: 'Tiedote päivitetty.' });
-    } else {
-      const { error } = await supabase.from('announcements').insert(payload);
-      if (error) setMessage({ type: 'error', text: 'Virhe luotaessa tiedotetta.' });
-      else setMessage({ type: 'success', text: 'Tiedote luotu.' });
+    try {
+      const data = {
+        ...payload,
+        updated_at: serverTimestamp(),
+      };
+
+      if (editingId) {
+        await updateDoc(doc(db, 'announcements', editingId), data);
+        setMessage({ type: 'success', text: 'Tiedote päivitetty.' });
+      } else {
+        await addDoc(collection(db, 'announcements'), {
+          ...data,
+          created_at: serverTimestamp(),
+        });
+        setMessage({ type: 'success', text: 'Tiedote luotu.' });
+      }
+      resetForm();
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Virhe tallennettaessa tiedotetta.' });
+      handleFirestoreError(error, editingId ? OperationType.UPDATE : OperationType.CREATE, 'announcements');
     }
-    
-    resetForm();
-    fetchAnnouncements();
   }
 
   async function handleDelete(id: string) {
     if (!confirm('Haluatko varmasti poistaa tämän tiedotteen?')) return;
 
-    if (isMockSupabase) {
+    if (isMockFirebase) {
       setAnnouncements(prev => prev.filter(a => a.id !== id));
       setMessage({ type: 'success', text: 'Tiedote poistettu (Mock).' });
       return;
     }
 
-    const { error } = await supabase.from('announcements').delete().eq('id', id);
-    if (error) setMessage({ type: 'error', text: 'Virhe poistettaessa tiedotetta.' });
-    else setMessage({ type: 'success', text: 'Tiedote poistettu.' });
-    
-    fetchAnnouncements();
+    try {
+      await deleteDoc(doc(db, 'announcements', id));
+      setMessage({ type: 'success', text: 'Tiedote poistettu.' });
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Virhe poistettaessa tiedotetta.' });
+      handleFirestoreError(error, OperationType.DELETE, `announcements/${id}`);
+    }
   }
 
   async function togglePublish(id: string, currentStatus: boolean) {
-    if (isMockSupabase) {
+    if (isMockFirebase) {
       setAnnouncements(prev => prev.map(a => a.id === id ? { ...a, is_published: !currentStatus } : a));
       return;
     }
 
-    await supabase.from('announcements').update({ is_published: !currentStatus }).eq('id', id);
-    fetchAnnouncements();
+    try {
+      await updateDoc(doc(db, 'announcements', id), {
+        is_published: !currentStatus,
+        updated_at: serverTimestamp(),
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `announcements/${id}`);
+    }
   }
 
   return (

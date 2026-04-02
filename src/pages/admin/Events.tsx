@@ -1,5 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { supabase, isMockSupabase } from '../../lib/supabase';
+import { db, isMockFirebase } from '../../lib/firebase';
+import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../../lib/firestore-utils';
 import { mockEvents } from '../../lib/mock-data';
 import type { Tables } from '../../types/database';
 import { Button } from '../../components/ui/Button';
@@ -31,29 +33,29 @@ export function Events() {
   const [isPublished, setIsPublished] = useState(true);
 
   useEffect(() => {
-    fetchEvents();
-  }, []);
-
-  async function fetchEvents() {
-    setLoading(true);
-    if (isMockSupabase) {
+    if (isMockFirebase) {
       setEvents(mockEvents);
       setLoading(false);
       return;
     }
 
-    const { data, error } = await supabase
-      .from('events')
-      .select('*')
-      .order('event_date', { ascending: true });
+    const q = query(collection(db, 'events'), orderBy('event_date', 'asc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          ...d,
+          created_at: d.created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+          updated_at: d.updated_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+        } as Event;
+      });
+      setEvents(data);
+      setLoading(false);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'events'));
 
-    if (error) {
-      console.error('Error fetching events:', error);
-    } else {
-      setEvents(data || []);
-    }
-    setLoading(false);
-  }
+    return () => unsubscribe();
+  }, []);
 
   function resetForm() {
     setTitle('');
@@ -95,7 +97,7 @@ export function Events() {
       is_published: isPublished,
     };
 
-    if (isMockSupabase) {
+    if (isMockFirebase) {
       if (editingId) {
         setEvents(prev => prev.map(ev => ev.id === editingId ? { ...ev, ...payload, updated_at: new Date().toISOString() } : ev));
         setMessage({ type: 'success', text: 'Tapahtuma päivitetty (Mock).' });
@@ -105,7 +107,7 @@ export function Events() {
           id: Math.random().toString(),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        };
+        } as Event;
         setEvents([...events, newEvent].sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime()));
         setMessage({ type: 'success', text: 'Tapahtuma luotu (Mock).' });
       }
@@ -113,52 +115,61 @@ export function Events() {
       return;
     }
 
-    if (editingId) {
-      const { error } = await supabase.from('events').update(payload).eq('id', editingId);
-      if (error) {
-        setMessage({ type: 'error', text: 'Tapahtuman päivitys epäonnistui.' });
-        return;
+    try {
+      const data = {
+        ...payload,
+        updated_at: serverTimestamp(),
+      };
+
+      if (editingId) {
+        await updateDoc(doc(db, 'events', editingId), data);
+        setMessage({ type: 'success', text: 'Tapahtuma päivitetty.' });
+      } else {
+        await addDoc(collection(db, 'events'), {
+          ...data,
+          created_at: serverTimestamp(),
+        });
+        setMessage({ type: 'success', text: 'Tapahtuma luotu.' });
       }
-      setMessage({ type: 'success', text: 'Tapahtuma päivitetty.' });
-    } else {
-      const { error } = await supabase.from('events').insert(payload);
-      if (error) {
-        setMessage({ type: 'error', text: 'Tapahtuman luonti epäonnistui.' });
-        return;
-      }
-      setMessage({ type: 'success', text: 'Tapahtuma luotu.' });
+      resetForm();
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Tapahtuman tallennus epäonnistui.' });
+      handleFirestoreError(error, editingId ? OperationType.UPDATE : OperationType.CREATE, 'events');
     }
-    
-    resetForm();
-    fetchEvents();
   }
 
   async function handleDelete(id: string) {
     if (!confirm('Haluatko varmasti poistaa tämän tapahtuman?')) return;
 
-    if (isMockSupabase) {
+    if (isMockFirebase) {
       setEvents(prev => prev.filter(e => e.id !== id));
       setMessage({ type: 'success', text: 'Tapahtuma poistettu (Mock).' });
       return;
     }
 
-    const { error } = await supabase.from('events').delete().eq('id', id);
-    if (error) {
-      setMessage({ type: 'error', text: 'Tapahtuman poisto epäonnistui.' });
-    } else {
+    try {
+      await deleteDoc(doc(db, 'events', id));
       setMessage({ type: 'success', text: 'Tapahtuma poistettu.' });
-      fetchEvents();
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Tapahtuman poisto epäonnistui.' });
+      handleFirestoreError(error, OperationType.DELETE, `events/${id}`);
     }
   }
 
   async function togglePublish(id: string, currentStatus: boolean) {
-    if (isMockSupabase) {
+    if (isMockFirebase) {
       setEvents(prev => prev.map(e => e.id === id ? { ...e, is_published: !currentStatus } : e));
       return;
     }
 
-    await supabase.from('events').update({ is_published: !currentStatus }).eq('id', id);
-    fetchEvents();
+    try {
+      await updateDoc(doc(db, 'events', id), {
+        is_published: !currentStatus,
+        updated_at: serverTimestamp(),
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `events/${id}`);
+    }
   }
 
   return (
