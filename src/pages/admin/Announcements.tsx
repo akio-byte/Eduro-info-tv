@@ -206,7 +206,14 @@ export function Announcements() {
             )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="title">Otsikko</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="title">Otsikko</Label>
+                  <AIAssistant 
+                    currentText={body} 
+                    onAccept={(newText) => setTitle(newText)} 
+                    allowedActions={['SUGGEST_TITLES']}
+                  />
+                </div>
                 <Input
                   id="title"
                   value={title}

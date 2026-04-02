@@ -106,7 +106,7 @@ export const generateAiContent = onCall(async (request) => {
 
     // Call Gemini API
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-preview', // Fast and cost-effective model
+      model: 'gemini-3-flash-preview', // Fixed model name
       contents: prompt,
       config: config
     });
@@ -120,14 +120,14 @@ export const generateAiContent = onCall(async (request) => {
         return { result: titles };
       } catch (e) {
         console.error('Failed to parse titles JSON', resultText);
-        throw new HttpsError('internal', 'Tekoäly palautti virheellisen vastauksen otsikoille.');
+        throw new HttpsError('unknown', 'Tekoäly palautti virheellisen vastauksen otsikoille.');
       }
     }
 
     return { result: resultText.trim() };
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Gemini API Error:', error);
-    throw new HttpsError('internal', 'Virhe tekoälysisällön generoinnissa.');
+    throw new HttpsError('unknown', `Virhe tekoälysisällön generoinnissa: ${error?.message || 'Tuntematon virhe'}`);
   }
 });

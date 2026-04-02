@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Ca
 import { Plus, Pencil, Trash2, X, Image as ImageIcon, Upload, Calendar as CalendarIcon, ArrowUp, ArrowDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { fi } from 'date-fns/locale';
+import { AIAssistant } from '../../components/ui/AIAssistant';
 
 export function Highlights() {
   const [highlights, setHighlights] = useState<Highlight[]>([]);
@@ -314,7 +315,14 @@ export function Highlights() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="title">Otsikko</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="title">Otsikko</Label>
+                    <AIAssistant 
+                      currentText={body} 
+                      onAccept={(newText) => setTitle(newText)} 
+                      allowedActions={['SUGGEST_TITLES']}
+                    />
+                  </div>
                   <Input
                     id="title"
                     value={title}
@@ -332,7 +340,13 @@ export function Highlights() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="body">Sisältö (valinnainen)</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="body">Sisältö (valinnainen)</Label>
+                  <AIAssistant 
+                    currentText={body} 
+                    onAccept={(newText) => setBody(newText)} 
+                  />
+                </div>
                 <Textarea
                   id="body"
                   value={body}

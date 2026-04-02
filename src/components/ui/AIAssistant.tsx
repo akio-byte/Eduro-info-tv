@@ -6,14 +6,20 @@ import { useAiAction, AiActionType, AiRequestOptions } from '../../hooks/useAiAc
 interface AIAssistantProps {
   currentText: string;
   onAccept: (newText: string) => void;
+  allowedActions?: AiActionType[];
   className?: string;
 }
 
 type MenuState = 'CLOSED' | 'MENU' | 'LOADING' | 'RESULT' | 'ERROR';
 
-export function AIAssistant({ currentText, onAccept, className = '' }: AIAssistantProps) {
+export function AIAssistant({ 
+  currentText, 
+  onAccept, 
+  allowedActions = ['SUMMARIZE', 'REWRITE_TONE', 'SHORTEN'],
+  className = '' 
+}: AIAssistantProps) {
   const [menuState, setMenuState] = useState<MenuState>('CLOSED');
-  const [resultText, setResultText] = useState<string>('');
+  const [resultData, setResultData] = useState<string | string[]>('');
   const { generateContent, isLoading, error, clearError } = useAiAction();
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -38,34 +44,29 @@ export function AIAssistant({ currentText, onAccept, className = '' }: AIAssista
   }, [error]);
 
   const handleAction = async (action: AiActionType, options?: AiRequestOptions) => {
-    if (!currentText.trim()) {
-      alert('Kirjoita ensin tekstiä, jota haluat muokata.');
-      setMenuState('CLOSED');
-      return;
-    }
-
     setMenuState('LOADING');
     const result = await generateContent(action, currentText, options);
     
-    if (result && typeof result === 'string') {
-      setResultText(result);
+    if (result) {
+      setResultData(result);
       setMenuState('RESULT');
-    } else if (result && Array.isArray(result)) {
-      // Fallback if we accidentally get an array (e.g. from SUGGEST_TITLES which is not implemented in this UI yet)
-      setResultText(result[0]);
-      setMenuState('RESULT');
+    } else {
+      // If result is null, the hook either encountered an error or validation failed.
+      // The useEffect will catch the error state and setMenuState('ERROR').
+      // But if there's no error (shouldn't happen), we fallback to CLOSED.
+      if (!error) setMenuState('CLOSED');
     }
   };
 
-  const handleAccept = () => {
-    onAccept(resultText);
+  const handleAccept = (text: string) => {
+    onAccept(text);
     setMenuState('CLOSED');
-    setResultText('');
+    setResultData('');
   };
 
   const handleCancel = () => {
     setMenuState('CLOSED');
-    setResultText('');
+    setResultData('');
     clearError();
   };
 
@@ -92,54 +93,82 @@ export function AIAssistant({ currentText, onAccept, className = '' }: AIAssista
           {/* State: MENU */}
           {menuState === 'MENU' && (
             <div className="p-2 space-y-1">
-              <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Muokkaa tekstiä
-              </div>
-              <button
-                type="button"
-                className="w-full text-left px-2 py-2 text-sm rounded hover:bg-slate-100 transition-colors"
-                onClick={() => handleAction('SUMMARIZE')}
-              >
-                Tiivistä infonäytölle (max 3 lausetta)
-              </button>
-              
-              <div className="border-t border-slate-100 my-1"></div>
-              <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Muuta sävyä
-              </div>
-              <button
-                type="button"
-                className="w-full text-left px-2 py-2 text-sm rounded hover:bg-slate-100 transition-colors"
-                onClick={() => handleAction('REWRITE_TONE', { tone: 'clear' })}
-              >
-                Selkeä ja ymmärrettävä
-              </button>
-              <button
-                type="button"
-                className="w-full text-left px-2 py-2 text-sm rounded hover:bg-slate-100 transition-colors"
-                onClick={() => handleAction('REWRITE_TONE', { tone: 'official' })}
-              >
-                Virallinen ja asiallinen
-              </button>
-              <button
-                type="button"
-                className="w-full text-left px-2 py-2 text-sm rounded hover:bg-slate-100 transition-colors"
-                onClick={() => handleAction('REWRITE_TONE', { tone: 'inspiring' })}
-              >
-                Innostava ja positiivinen
-              </button>
+              {allowedActions.includes('SUGGEST_TITLES') && (
+                <>
+                  <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    Otsikkoehdotukset
+                  </div>
+                  <button
+                    type="button"
+                    className="w-full text-left px-2 py-2 text-sm rounded hover:bg-slate-100 transition-colors"
+                    onClick={() => handleAction('SUGGEST_TITLES')}
+                  >
+                    Ehdota otsikoita sisällön pohjalta
+                  </button>
+                  <div className="border-t border-slate-100 my-1"></div>
+                </>
+              )}
 
-              <div className="border-t border-slate-100 my-1"></div>
-              <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Pakota pituus
-              </div>
-              <button
-                type="button"
-                className="w-full text-left px-2 py-2 text-sm rounded hover:bg-slate-100 transition-colors"
-                onClick={() => handleAction('SHORTEN', { lines: 2 })}
-              >
-                Lyhennä noin 2 riviin
-              </button>
+              {allowedActions.includes('SUMMARIZE') && (
+                <>
+                  <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    Muokkaa tekstiä
+                  </div>
+                  <button
+                    type="button"
+                    className="w-full text-left px-2 py-2 text-sm rounded hover:bg-slate-100 transition-colors"
+                    onClick={() => handleAction('SUMMARIZE')}
+                  >
+                    Tiivistä infonäytölle (max 3 lausetta)
+                  </button>
+                </>
+              )}
+              
+              {allowedActions.includes('REWRITE_TONE') && (
+                <>
+                  <div className="border-t border-slate-100 my-1"></div>
+                  <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    Muuta sävyä
+                  </div>
+                  <button
+                    type="button"
+                    className="w-full text-left px-2 py-2 text-sm rounded hover:bg-slate-100 transition-colors"
+                    onClick={() => handleAction('REWRITE_TONE', { tone: 'clear' })}
+                  >
+                    Selkeä ja ymmärrettävä
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full text-left px-2 py-2 text-sm rounded hover:bg-slate-100 transition-colors"
+                    onClick={() => handleAction('REWRITE_TONE', { tone: 'official' })}
+                  >
+                    Virallinen ja asiallinen
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full text-left px-2 py-2 text-sm rounded hover:bg-slate-100 transition-colors"
+                    onClick={() => handleAction('REWRITE_TONE', { tone: 'inspiring' })}
+                  >
+                    Innostava ja positiivinen
+                  </button>
+                </>
+              )}
+
+              {allowedActions.includes('SHORTEN') && (
+                <>
+                  <div className="border-t border-slate-100 my-1"></div>
+                  <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    Pakota pituus
+                  </div>
+                  <button
+                    type="button"
+                    className="w-full text-left px-2 py-2 text-sm rounded hover:bg-slate-100 transition-colors"
+                    onClick={() => handleAction('SHORTEN', { lines: 2 })}
+                  >
+                    Lyhennä noin 2 riviin
+                  </button>
+                </>
+              )}
             </div>
           )}
 
@@ -170,16 +199,35 @@ export function AIAssistant({ currentText, onAccept, className = '' }: AIAssista
               <div className="text-xs font-semibold text-indigo-600 uppercase tracking-wider flex items-center">
                 <Sparkles className="h-3 w-3 mr-1" /> Ehdotus
               </div>
-              <div className="text-sm text-slate-700 bg-slate-50 p-3 rounded border border-slate-200 max-h-48 overflow-y-auto whitespace-pre-wrap">
-                {resultText}
-              </div>
+              
+              {Array.isArray(resultData) ? (
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                  {resultData.map((title, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      className="w-full text-left text-sm text-slate-700 bg-slate-50 hover:bg-indigo-50 p-3 rounded border border-slate-200 hover:border-indigo-200 transition-colors"
+                      onClick={() => handleAccept(title)}
+                    >
+                      {title}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-slate-700 bg-slate-50 p-3 rounded border border-slate-200 max-h-48 overflow-y-auto whitespace-pre-wrap">
+                  {resultData}
+                </div>
+              )}
+
               <div className="flex space-x-2 pt-2">
                 <Button type="button" variant="outline" size="sm" className="flex-1" onClick={handleCancel}>
                   <X className="h-4 w-4 mr-1" /> Hylkää
                 </Button>
-                <Button type="button" size="sm" className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white" onClick={handleAccept}>
-                  <Check className="h-4 w-4 mr-1" /> Korvaa
-                </Button>
+                {!Array.isArray(resultData) && (
+                  <Button type="button" size="sm" className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white" onClick={() => handleAccept(resultData as string)}>
+                    <Check className="h-4 w-4 mr-1" /> Korvaa
+                  </Button>
+                )}
               </div>
             </div>
           )}

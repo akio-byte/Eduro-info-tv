@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { httpsCallable } from 'firebase/functions';
-import { functions } from '../lib/firebase';
+import { functions, isMockFirebase } from '../lib/firebase';
 
 export type AiActionType = 'SUMMARIZE' | 'SUGGEST_TITLES' | 'REWRITE_TONE' | 'SHORTEN';
 
@@ -31,6 +31,19 @@ export function useAiAction() {
     setError(null);
 
     try {
+      if (isMockFirebase) {
+        // Simulate network delay
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        if (action === 'SUGGEST_TITLES') {
+          return [
+            '[MOCK] Ensimmäinen iskevä otsikko',
+            '[MOCK] Toinen kiinnostava vaihtoehto',
+            '[MOCK] Kolmas lyhyt ja ytimekäs'
+          ];
+        }
+        return `[MOCK AI] Tässä on generoitu teksti toiminnolle: ${action}. Alkuperäinen pituus oli ${text.length} merkkiä.`;
+      }
+
       const generateAiContent = httpsCallable<{ action: AiActionType; text: string; options?: AiRequestOptions }, AiResponse>(
         functions,
         'generateAiContent'
