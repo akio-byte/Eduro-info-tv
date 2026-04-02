@@ -14,19 +14,6 @@ import { fi } from 'date-fns/locale';
 
 type Event = Tables<'events'>;
 
-
-function formatSupabaseError(error: { message: string; code?: string; details?: string; hint?: string } | null) {
-  if (!error) return 'Tuntematon virhe.';
-
-  const parts = [error.message];
-  if (error.code) parts.push(`koodi: ${error.code}`);
-  if (error.details) parts.push(`details: ${error.details}`);
-  if (error.hint) parts.push(`hint: ${error.hint}`);
-
-  return parts.join(' | ');
-}
-
-
 export function Events() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +55,7 @@ export function Events() {
     setLoading(false);
   }
 
-  function resetForm(clearMessage = true) {
+  function resetForm() {
     setTitle('');
     setDescription('');
     setEventDate('');
@@ -78,7 +65,7 @@ export function Events() {
     setIsPublished(true);
     setEditingId(null);
     setIsFormOpen(false);
-    if (clearMessage) setMessage(null);
+    setMessage(null);
   }
 
   function openEditForm(event: Event) {
@@ -100,8 +87,8 @@ export function Events() {
     
     const payload = {
       title,
-      description: description || null,
-      event_date: eventDate,
+      description,
+      event_date: new Date(eventDate).toISOString(),
       start_time: startTime || null,
       end_time: endTime || null,
       location: location || null,
@@ -129,22 +116,20 @@ export function Events() {
     if (editingId) {
       const { error } = await supabase.from('events').update(payload).eq('id', editingId);
       if (error) {
-        console.error('Error updating event:', { error, payload, editingId });
-        setMessage({ type: 'error', text: `Tapahtuman päivitys epäonnistui: ${formatSupabaseError(error)}` });
+        setMessage({ type: 'error', text: 'Tapahtuman päivitys epäonnistui.' });
         return;
       }
       setMessage({ type: 'success', text: 'Tapahtuma päivitetty.' });
     } else {
       const { error } = await supabase.from('events').insert(payload);
       if (error) {
-        console.error('Error creating event:', { error, payload });
-        setMessage({ type: 'error', text: `Tapahtuman luonti epäonnistui: ${formatSupabaseError(error)}` });
+        setMessage({ type: 'error', text: 'Tapahtuman luonti epäonnistui.' });
         return;
       }
       setMessage({ type: 'success', text: 'Tapahtuma luotu.' });
     }
     
-    resetForm(false);
+    resetForm();
     fetchEvents();
   }
 
@@ -159,8 +144,7 @@ export function Events() {
 
     const { error } = await supabase.from('events').delete().eq('id', id);
     if (error) {
-      console.error('Error deleting event:', { error, id });
-      setMessage({ type: 'error', text: `Tapahtuman poisto epäonnistui: ${formatSupabaseError(error)}` });
+      setMessage({ type: 'error', text: 'Tapahtuman poisto epäonnistui.' });
     } else {
       setMessage({ type: 'success', text: 'Tapahtuma poistettu.' });
       fetchEvents();

@@ -3,13 +3,11 @@ import type { Database } from '../types/database';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const hasSupabaseEnv = Boolean(supabaseUrl && supabaseAnonKey);
-export const isMockSupabase =
-  import.meta.env.VITE_ENABLE_MOCK_MODE === 'true' || !hasSupabaseEnv;
+export const isMockSupabase = import.meta.env.VITE_ENABLE_MOCK_MODE === 'true';
 
-if (!hasSupabaseEnv && import.meta.env.VITE_ENABLE_MOCK_MODE !== 'true') {
-  console.warn(
-    '[supabase] Missing VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY. Falling back to mock mode for startup.'
+if (!isMockSupabase && (!supabaseUrl || !supabaseAnonKey)) {
+  throw new Error(
+    'Missing Supabase environment variables. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, or enable mock mode with VITE_ENABLE_MOCK_MODE=true.'
   );
 }
 
@@ -19,3 +17,4 @@ export const supabase = createClient<any>(
   supabaseUrl || 'https://mock.supabase.co',
   supabaseAnonKey || 'mock-key'
 );
+

@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent, type ChangeEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { supabase, isMockSupabase } from '../../lib/supabase';
 import { mockHighlights } from '../../lib/mock-data';
 import type { Tables } from '../../types/database';
@@ -13,19 +13,6 @@ import { format } from 'date-fns';
 import { fi } from 'date-fns/locale';
 
 type Highlight = Tables<'highlights'>;
-
-
-function formatSupabaseError(error: { message: string; code?: string; details?: string; hint?: string } | null) {
-  if (!error) return 'Tuntematon virhe.';
-
-  const parts = [error.message];
-  if (error.code) parts.push(`koodi: ${error.code}`);
-  if (error.details) parts.push(`details: ${error.details}`);
-  if (error.hint) parts.push(`hint: ${error.hint}`);
-
-  return parts.join(' | ');
-}
-
 
 export function Highlights() {
   const [highlights, setHighlights] = useState<Highlight[]>([]);
@@ -72,7 +59,7 @@ export function Highlights() {
     setLoading(false);
   }
 
-  function resetForm(clearMessage = true) {
+  function resetForm() {
     setTitle('');
     setSubtitle('');
     setBody('');
@@ -85,7 +72,7 @@ export function Highlights() {
     setIsPublished(true);
     setEditingId(null);
     setIsFormOpen(false);
-    if (clearMessage) setMessage(null);
+    setMessage(null);
   }
 
   function openEditForm(highlight: Highlight) {
@@ -104,7 +91,7 @@ export function Highlights() {
     setMessage(null);
   }
 
-  async function handleImageUpload(e: ChangeEvent<HTMLInputElement>) {
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     if (!e.target.files || e.target.files.length === 0) return;
     
     const file = e.target.files[0];
@@ -132,7 +119,7 @@ export function Highlights() {
 
     if (uploadError) {
       console.error('Error uploading image:', uploadError);
-      setMessage({ type: 'error', text: `Kuvan lataus epäonnistui: ${formatSupabaseError(uploadError)}` });
+      setMessage({ type: 'error', text: 'Kuvan lataus epäonnistui.' });
       setUploading(false);
       return;
     }
@@ -194,22 +181,20 @@ export function Highlights() {
     if (editingId) {
       const { error } = await supabase.from('highlights').update(payload).eq('id', editingId);
       if (error) {
-        console.error('Error updating highlight:', { error, payload, editingId });
-        setMessage({ type: 'error', text: `Noston päivitys epäonnistui: ${formatSupabaseError(error)}` });
+        setMessage({ type: 'error', text: 'Noston päivitys epäonnistui.' });
         return;
       }
       setMessage({ type: 'success', text: 'Nosto päivitetty.' });
     } else {
       const { error } = await supabase.from('highlights').insert({ ...payload, sort_order: highlights.length + 1 });
       if (error) {
-        console.error('Error creating highlight:', { error, payload });
-        setMessage({ type: 'error', text: `Noston luonti epäonnistui: ${formatSupabaseError(error)}` });
+        setMessage({ type: 'error', text: 'Noston luonti epäonnistui.' });
         return;
       }
       setMessage({ type: 'success', text: 'Nosto luotu.' });
     }
     
-    resetForm(false);
+    resetForm();
     fetchHighlights();
   }
 
@@ -230,8 +215,7 @@ export function Highlights() {
 
     const { error } = await supabase.from('highlights').delete().eq('id', id);
     if (error) {
-      console.error('Error deleting highlight:', { error, id });
-      setMessage({ type: 'error', text: `Noston poisto epäonnistui: ${formatSupabaseError(error)}` });
+      setMessage({ type: 'error', text: 'Noston poisto epäonnistui.' });
     } else {
       setMessage({ type: 'success', text: 'Nosto poistettu.' });
       fetchHighlights();
