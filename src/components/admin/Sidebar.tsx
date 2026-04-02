@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Megaphone, Calendar, Star, QrCode, Settings, LogOut, MonitorPlay, Eye } from 'lucide-react';
+import { LayoutDashboard, Megaphone, Calendar, Star, QrCode, Settings, LogOut, MonitorPlay, Eye, User } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 const navigation = [
@@ -8,6 +8,7 @@ const navigation = [
   { name: 'Tapahtumat', href: '/admin/events', icon: Calendar, roles: ['admin', 'editor'] },
   { name: 'Nostot', href: '/admin/highlights', icon: Star, roles: ['admin', 'editor'] },
   { name: 'QR-linkit', href: '/admin/qr-links', icon: QrCode, roles: ['admin', 'editor'] },
+  { name: 'Käyttäjät', href: '/admin/users', icon: User, roles: ['admin'] },
   { name: 'Asetukset', href: '/admin/settings', icon: Settings, roles: ['admin'] },
 ];
 
