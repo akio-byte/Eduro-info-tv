@@ -4,7 +4,7 @@ import { collection, onSnapshot, query, where, orderBy, doc, Timestamp } from 'f
 import { handleFirestoreError, OperationType } from '../../lib/firestore-utils';
 import { mockSettings } from '../../lib/mock-data';
 import type { ContentItem, DisplaySettings as Settings } from '../../types/firestore';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { fi } from 'date-fns/locale';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -307,7 +307,7 @@ export function Display() {
                           <div>
                             <div className={`text-xl mb-1 font-bold uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Aika</div>
                             <div className={`text-3xl font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                              {format(new Date(currentContent.event_date), 'd.M.yyyy')}
+                              {format(parseISO(currentContent.event_date), 'd.M.yyyy')}
                               {currentContent.start_time && (
                                 <span className={`ml-4 ${isLight ? 'text-slate-400' : 'text-slate-400'}`}>klo {currentContent.start_time}</span>
                               )}

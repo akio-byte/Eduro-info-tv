@@ -44,23 +44,39 @@ export function Settings() {
       return;
     }
 
-    const q = query(collection(db, 'display_settings'), limit(1));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        const doc = snapshot.docs[0];
-        const d = doc.data();
+    const docRef = doc(db, 'display_settings', 'default');
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const d = docSnap.data();
         setSettings({
-          id: doc.id,
+          id: docSnap.id,
           ...d,
           theme: d.theme || 'dark',
           created_at: d.created_at instanceof Timestamp ? d.created_at.toDate().toISOString() : d.created_at,
           updated_at: d.updated_at instanceof Timestamp ? d.updated_at.toDate().toISOString() : d.updated_at,
         } as any as Settings);
       } else {
-        setSettings(null);
+        // If no settings exist, provide default settings so the user can save them
+        setSettings({
+          id: 'default',
+          org_name: 'Eduro',
+          welcome_text: 'Tervetuloa InfoTV:hen',
+          rotation_interval_seconds: 15,
+          show_announcements: true,
+          show_events: true,
+          show_highlights: true,
+          show_qr_links: true,
+          show_opening_hours: false,
+          opening_hours_text: '',
+          fallback_message: 'Ei uusia tiedotteita tällä hetkellä.',
+          accent_color: '#4f46e5',
+          theme: 'dark',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        } as any as Settings);
       }
       setLoading(false);
-    }, (error) => handleFirestoreError(error, OperationType.GET, 'display_settings'));
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'display_settings/default'));
 
     return () => unsubscribe();
   }, [role]);
@@ -96,21 +112,16 @@ export function Settings() {
         updated_at: serverTimestamp(),
       };
 
-      if (id) {
-        await updateDoc(doc(db, 'display_settings', id), payload);
-      } else {
-        // If no settings exist, create them
-        const querySnapshot = await getDocs(collection(db, 'display_settings'));
-        if (querySnapshot.empty) {
-          await setDoc(doc(collection(db, 'display_settings')), {
-            ...payload,
-            created_at: serverTimestamp(),
-          });
-        } else {
-          const existingDoc = querySnapshot.docs[0];
-          await updateDoc(doc(db, 'display_settings', existingDoc.id), payload);
-        }
+      if (id && id !== 'default') {
+        // Migration: if somehow it was saved with a random ID, we should probably delete it, 
+        // but for now let's just ensure we write to 'default'
       }
+      
+      await setDoc(doc(db, 'display_settings', 'default'), {
+        ...payload,
+        created_at: settings.created_at ? (settings.created_at instanceof Timestamp ? settings.created_at : Timestamp.fromDate(new Date(settings.created_at))) : serverTimestamp(),
+      }, { merge: true });
+      
       setMessage({ type: 'success', text: 'Asetukset tallennettu onnistuneesti.' });
     } catch (error) {
       setMessage({ type: 'error', text: 'Virhe tallennettaessa asetuksia.' });

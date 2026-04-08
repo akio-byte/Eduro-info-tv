@@ -47,7 +47,7 @@ import {
 import { format } from 'date-fns';
 import { fi } from 'date-fns/locale';
 import type { ContentItem, ContentType } from '../../types/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { storage } from '../../lib/firebase';
 
 export function Content() {
@@ -258,6 +258,16 @@ export function Content() {
     }
 
     try {
+      const itemToDelete = items.find(i => i.id === id);
+      if (itemToDelete?.media_url && itemToDelete.media_url.includes('firebasestorage.googleapis.com')) {
+        try {
+          const fileRef = ref(storage, itemToDelete.media_url);
+          await deleteObject(fileRef);
+        } catch (storageError) {
+          console.error('Virhe poistettaessa mediatiedostoa:', storageError);
+        }
+      }
+
       await deleteDoc(doc(db, 'content_items', id));
       setMessage({ type: 'success', text: 'Julkaisu poistettu.' });
       setDeleteConfirmId(null);
