@@ -99,13 +99,30 @@ service cloud.firestore {
     
     function isAdmin() {
       return isAuthenticated() && (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        request.auth.token.email == "aki.oksala@gmail.com" ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
       );
     }
     
     function isEditor() {
       return isAuthenticated() && (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'editor']
+        request.auth.token.email == "aki.oksala@gmail.com" ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'editor'])
+      );
+    }
+
+    function getUserOrg() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.org_id 
+        : 'default-org';
+    }
+
+    function isOrgMember(orgId) {
+      return isAuthenticated() && (
+        request.auth.token.email == "aki.oksala@gmail.com" ||
+        getUserOrg() == orgId
       );
     }
     
@@ -128,53 +145,37 @@ service cloud.firestore {
     function isValidUser(data) {
       return data.email is string && isValidEmail(data.email) &&
              data.role in ['admin', 'editor'] &&
-             data.keys().hasAll(['email', 'role']);
+             data.org_id is string &&
+             data.keys().hasAll(['email', 'role', 'org_id']);
     }
 
-    function isValidAnnouncement(data) {
-      return data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
-             data.body is string && data.body.size() > 0 && data.body.size() < 2000 &&
-             data.priority in ['high', 'normal', 'low'] &&
-             data.is_published is bool &&
-             data.created_at is timestamp &&
-             data.updated_at is timestamp &&
-             data.keys().hasAll(['title', 'body', 'priority', 'is_published', 'created_at', 'updated_at']);
+    function isValidInvitation(data) {
+      return data.email is string && isValidEmail(data.email) &&
+             data.org_id is string &&
+             data.role in ['admin', 'editor'] &&
+             data.status in ['pending', 'accepted', 'expired'] &&
+             data.keys().hasAll(['email', 'org_id', 'role', 'status', 'invited_by', 'created_at', 'expires_at']);
     }
 
-    function isValidEvent(data) {
+    function isValidContentItem(data) {
       return data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
-             data.event_date is string && data.event_date.matches("^\\d{4}-\\d{2}-\\d{2}$") &&
+             data.type in ['announcement', 'event', 'media', 'qr', 'mixed'] &&
+             data.org_id is string &&
              data.is_published is bool &&
-             data.created_at is timestamp &&
-             data.updated_at is timestamp &&
-             data.keys().hasAll(['title', 'event_date', 'is_published', 'created_at', 'updated_at']);
-    }
-
-    function isValidHighlight(data) {
-      return data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
-             data.is_published is bool &&
-             data.sort_order is int &&
-             data.created_at is timestamp &&
-             data.updated_at is timestamp &&
-             data.keys().hasAll(['title', 'is_published', 'sort_order', 'created_at', 'updated_at']);
-    }
-
-    function isValidQrLink(data) {
-      return data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
-             data.url is string && isValidUrl(data.url) &&
-             data.is_published is bool &&
-             data.sort_order is int &&
-             data.created_at is timestamp &&
-             data.updated_at is timestamp &&
-             data.keys().hasAll(['title', 'url', 'is_published', 'sort_order', 'created_at', 'updated_at']);
+             data.is_archived is bool &&
+             (!('media_url' in data) || data.media_url == null || data.media_url is string) &&
+             (!('media_type' in data) || data.media_type in ['none', 'image', 'video']) &&
+             (data.created_at is timestamp || !('created_at' in data)) &&
+             (data.updated_at is timestamp || !('updated_at' in data)) &&
+             data.keys().hasAll(['title', 'type', 'org_id', 'is_published', 'is_archived']);
     }
 
     function isValidSettings(data) {
       return data.org_name is string && data.org_name.size() > 0 && data.org_name.size() < 100 &&
              data.rotation_interval_seconds is int && data.rotation_interval_seconds >= 5 &&
              data.accent_color is string && data.accent_color.matches("^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$") &&
-             data.updated_at is timestamp &&
-             data.keys().hasAll(['org_name', 'rotation_interval_seconds', 'accent_color', 'updated_at']);
+             (data.updated_at is timestamp || !('updated_at' in data)) &&
+             data.keys().hasAll(['org_name', 'rotation_interval_seconds', 'accent_color']);
     }
 
     // ===============================================================
@@ -182,52 +183,76 @@ service cloud.firestore {
     // ===============================================================
 
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
+      allow read: if isAuthenticated() && (
+        isOwner(userId) || 
+        request.auth.token.email == "aki.oksala@gmail.com" ||
+        (isAdmin() && getUserOrg() == resource.data.org_id)
+      );
       
-      // Allow creation if user is authenticated and creating their own profile
-      // The first user bootstrap is handled in AuthContext, but rules must allow it.
-      // We allow 'admin' role only if no users exist yet (bootstrap) or if the creator is already an admin.
       allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && (
         request.resource.data.role == 'editor' || 
+        request.auth.token.email == "aki.oksala@gmail.com" ||
         !exists(/databases/$(database)/documents/users/$(request.auth.uid)) ||
         isAdmin()
       );
       
-      // Only admins can update roles. Users can update their own profile but not their role.
       allow update: if isAuthenticated() && isValidUser(request.resource.data) && (
-        isAdmin() || (isOwner(userId) && request.resource.data.role == resource.data.role)
+        request.auth.token.email == "aki.oksala@gmail.com" ||
+        (isAdmin() && getUserOrg() == resource.data.org_id) || 
+        (isOwner(userId) && request.resource.data.role == resource.data.role && request.resource.data.org_id == resource.data.org_id)
       );
       
-      // Only admins can delete users, and they cannot delete themselves.
-      allow delete: if isAdmin() && userId != request.auth.uid;
+      allow delete: if (request.auth.token.email == "aki.oksala@gmail.com" || isAdmin()) && userId != request.auth.uid && (request.auth.token.email == "aki.oksala@gmail.com" || getUserOrg() == resource.data.org_id);
+    }
+
+    match /invitations/{invitationId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() || 
+        request.auth.token.email == resource.data.email
+      );
+      
+      allow create: if isAdmin() && isValidInvitation(request.resource.data) && (
+        request.auth.token.email == "aki.oksala@gmail.com" ||
+        request.resource.data.org_id == getUserOrg()
+      );
+      
+      allow update: if isAuthenticated() && (
+        request.auth.token.email == "aki.oksala@gmail.com" ||
+        (isAdmin() && getUserOrg() == resource.data.org_id) ||
+        (request.auth.token.email == resource.data.email && request.resource.data.status == 'accepted')
+      );
+      
+      allow delete: if isAdmin() && (
+        request.auth.token.email == "aki.oksala@gmail.com" ||
+        getUserOrg() == resource.data.org_id
+      );
+    }
+
+    match /content_items/{itemId} {
+      allow read: if true; // Public display needs to read
+      allow create: if isEditor() && isValidContentItem(request.resource.data) && isOrgMember(request.resource.data.org_id);
+      allow update: if isEditor() && isValidContentItem(request.resource.data) && isOrgMember(resource.data.org_id) && isOrgMember(request.resource.data.org_id);
+      allow delete: if isEditor() && isOrgMember(resource.data.org_id);
     }
 
     match /announcements/{announcementId} {
-      allow read: if true; // Public display needs to read
-      allow create: if isEditor() && isValidAnnouncement(request.resource.data);
-      allow update: if isEditor() && isValidAnnouncement(request.resource.data);
-      allow delete: if isEditor();
+      allow read: if true;
+      allow write: if isEditor();
     }
 
     match /events/{eventId} {
       allow read: if true;
-      allow create: if isEditor() && isValidEvent(request.resource.data);
-      allow update: if isEditor() && isValidEvent(request.resource.data);
-      allow delete: if isEditor();
+      allow write: if isEditor();
     }
 
     match /highlights/{highlightId} {
       allow read: if true;
-      allow create: if isEditor() && isValidHighlight(request.resource.data);
-      allow update: if isEditor() && isValidHighlight(request.resource.data);
-      allow delete: if isEditor();
+      allow write: if isEditor();
     }
 
     match /qr_links/{qrLinkId} {
       allow read: if true;
-      allow create: if isEditor() && isValidQrLink(request.resource.data);
-      allow update: if isEditor() && isValidQrLink(request.resource.data);
-      allow delete: if isEditor();
+      allow write: if isEditor();
     }
 
     match /display_settings/{settingsId} {

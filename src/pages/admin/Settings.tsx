@@ -1,6 +1,6 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { db, isMockFirebase } from '../../lib/firebase';
-import { collection, onSnapshot, query, limit, updateDoc, doc, setDoc, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, onSnapshot, query, limit, updateDoc, doc, setDoc, getDocs, Timestamp, serverTimestamp } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-utils';
 import { mockSettings } from '../../lib/mock-data';
 import type { DisplaySettings } from '../../types/firestore';
@@ -13,6 +13,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../..
 import { useAuth } from '../../contexts/AuthContext';
 
 type Settings = DisplaySettings;
+
+import { 
+  Settings as SettingsIcon, 
+  Palette, 
+  Layout, 
+  Eye, 
+  Clock, 
+  Sun, 
+  Moon,
+  Monitor
+} from 'lucide-react';
 
 export function Settings() {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -28,7 +39,7 @@ export function Settings() {
     }
 
     if (isMockFirebase) {
-      setSettings(mockSettings);
+      setSettings({ ...mockSettings, theme: 'dark' });
       setLoading(false);
       return;
     }
@@ -41,6 +52,7 @@ export function Settings() {
         setSettings({
           id: doc.id,
           ...d,
+          theme: d.theme || 'dark',
           created_at: d.created_at instanceof Timestamp ? d.created_at.toDate().toISOString() : d.created_at,
           updated_at: d.updated_at instanceof Timestamp ? d.updated_at.toDate().toISOString() : d.updated_at,
         } as any as Settings);
@@ -77,27 +89,26 @@ export function Settings() {
     }
 
     try {
-      const { id, ...data } = settings;
+      const { id, created_at, updated_at, ...rest } = settings as any;
+      const payload = {
+        ...rest,
+        theme: rest.theme || 'dark',
+        updated_at: serverTimestamp(),
+      };
+
       if (id) {
-        await updateDoc(doc(db, 'display_settings', id), {
-          ...data,
-          updated_at: new Date().toISOString(),
-        });
+        await updateDoc(doc(db, 'display_settings', id), payload);
       } else {
         // If no settings exist, create them
         const querySnapshot = await getDocs(collection(db, 'display_settings'));
         if (querySnapshot.empty) {
           await setDoc(doc(collection(db, 'display_settings')), {
-            ...data,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
+            ...payload,
+            created_at: serverTimestamp(),
           });
         } else {
           const existingDoc = querySnapshot.docs[0];
-          await updateDoc(doc(db, 'display_settings', existingDoc.id), {
-            ...data,
-            updated_at: new Date().toISOString(),
-          });
+          await updateDoc(doc(db, 'display_settings', existingDoc.id), payload);
         }
       }
       setMessage({ type: 'success', text: 'Asetukset tallennettu onnistuneesti.' });
@@ -144,7 +155,80 @@ export function Settings() {
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Yleiset asetukset</CardTitle>
+            <div className="flex items-center gap-2">
+              <Palette className="h-5 w-5 text-indigo-600" />
+              <CardTitle>Ulkoasu ja teema</CardTitle>
+            </div>
+            <CardDescription>Määritä InfoTV-näytön visuaalinen ilme</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-4">
+              <Label>Värimaailma (Teema)</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  type="button"
+                  onClick={() => setSettings({ ...settings, theme: 'light' })}
+                  className={`flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all ${
+                    settings.theme === 'light' 
+                      ? 'border-indigo-600 bg-indigo-50/50' 
+                      : 'border-slate-100 bg-white hover:border-slate-200'
+                  }`}
+                >
+                  <div className="h-12 w-full bg-slate-50 rounded border border-slate-200 flex items-center justify-center">
+                    <Sun className="h-6 w-6 text-amber-500" />
+                  </div>
+                  <span className="font-medium text-sm">Vaalea</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSettings({ ...settings, theme: 'dark' })}
+                  className={`flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all ${
+                    settings.theme === 'dark' 
+                      ? 'border-indigo-600 bg-indigo-50/50' 
+                      : 'border-slate-100 bg-white hover:border-slate-200'
+                  }`}
+                >
+                  <div className="h-12 w-full bg-slate-950 rounded border border-slate-800 flex items-center justify-center">
+                    <Moon className="h-6 w-6 text-indigo-400" />
+                  </div>
+                  <span className="font-medium text-sm">Tumma</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="accentColor">Teeman korostusväri</Label>
+              <div className="flex items-center space-x-3">
+                <div 
+                  className="w-12 h-12 rounded-xl border shadow-sm"
+                  style={{ backgroundColor: settings.accent_color }}
+                />
+                <Input
+                  id="accentColor"
+                  type="text"
+                  value={settings.accent_color || '#0ea5e9'}
+                  onChange={(e) => setSettings({ ...settings, accent_color: e.target.value })}
+                  className="flex-1 font-mono"
+                  pattern="^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
+                  required
+                />
+                <Input
+                  type="color"
+                  className="w-12 h-10 p-1 cursor-pointer"
+                  value={settings.accent_color || '#0ea5e9'}
+                  onChange={(e) => setSettings({ ...settings, accent_color: e.target.value })}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Monitor className="h-5 w-5 text-indigo-600" />
+              <CardTitle>Yleiset asetukset</CardTitle>
+            </div>
             <CardDescription>Perustiedot ja näytön käyttäytyminen</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -187,27 +271,6 @@ export function Settings() {
                 onChange={(e) => setSettings({ ...settings, fallback_message: e.target.value })}
                 rows={2}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="accentColor">Teeman korostusväri (HEX)</Label>
-              <div className="flex items-center space-x-2">
-                <Input
-                  id="accentColor"
-                  type="color"
-                  className="w-16 h-10 p-1"
-                  value={settings.accent_color || '#0ea5e9'}
-                  onChange={(e) => setSettings({ ...settings, accent_color: e.target.value })}
-                  required
-                />
-                <Input
-                  type="text"
-                  value={settings.accent_color || '#0ea5e9'}
-                  onChange={(e) => setSettings({ ...settings, accent_color: e.target.value })}
-                  className="flex-1"
-                  pattern="^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
-                  required
-                />
-              </div>
             </div>
           </CardContent>
         </Card>

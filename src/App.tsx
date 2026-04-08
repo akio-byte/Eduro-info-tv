@@ -8,10 +8,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { AdminLayout } from './components/admin/AdminLayout';
 import { Login } from './pages/admin/Login';
 import { Dashboard } from './pages/admin/Dashboard';
-import { Announcements } from './pages/admin/Announcements';
-import { Events } from './pages/admin/Events';
-import { Highlights } from './pages/admin/Highlights';
-import { QrLinks } from './pages/admin/QrLinks';
+import { Content } from './pages/admin/Content';
 import { Users } from './pages/admin/Users';
 import { Settings } from './pages/admin/Settings';
 import { Preview } from './pages/admin/Preview';
@@ -29,13 +26,11 @@ export default function App() {
           
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<Dashboard />} />
-            <Route path="announcements" element={<Announcements />} />
-            <Route path="events" element={<Events />} />
-            <Route path="highlights" element={<Highlights />} />
-            <Route path="qr-links" element={<QrLinks />} />
+            <Route path="content" element={<Content />} />
             <Route path="users" element={<Users />} />
             <Route path="settings" element={<Settings />} />
             <Route path="preview" element={<Preview />} />
+            <Route path="*" element={<Navigate to="/admin" replace />} />
           </Route>
         </Routes>
       </BrowserRouter>

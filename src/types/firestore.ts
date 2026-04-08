@@ -6,62 +6,47 @@ export interface UserProfile {
   id: string;
   email: string;
   role: UserRole;
-  created_at: Timestamp | string;
-}
-
-export interface Announcement {
-  id: string;
-  title: string;
-  body: string;
-  priority: 'high' | 'normal' | 'low';
-  start_at: Timestamp | string | null;
-  end_at: Timestamp | string | null;
-  is_published: boolean;
+  org_id: string;
   created_at: Timestamp | string;
   updated_at: Timestamp | string;
 }
 
-export interface Event {
+export interface Invitation {
   id: string;
+  email: string;
+  org_id: string;
+  role: UserRole;
+  invited_by: string;
+  status: 'pending' | 'accepted' | 'expired';
+  created_at: Timestamp | string;
+  expires_at: Timestamp | string;
+}
+
+export type ContentType = 'announcement' | 'event' | 'media' | 'qr' | 'mixed';
+
+export interface ContentItem {
+  id: string;
+  org_id: string;
+  type: ContentType;
   title: string;
-  description: string | null;
-  event_date: string; // Keep as string for date input compatibility
+  body: string | null;
+  media_url: string | null;
+  media_type: 'none' | 'image' | 'video';
+  event_date: string | null;
   start_time: string | null;
   end_time: string | null;
   location: string | null;
+  qr_url: string | null;
+  publish_start: Timestamp | string | null;
+  publish_end: Timestamp | string | null;
+  duration_seconds: number;
   is_published: boolean;
-  created_at: Timestamp | string;
-  updated_at: Timestamp | string;
-}
-
-export interface Highlight {
-  id: string;
-  title: string;
-  subtitle: string | null;
-  body: string | null;
-  image_url: string | null;
-  image_path: string | null;
-  cta_label: string | null;
-  cta_url: string | null;
-  start_at: Timestamp | string | null;
-  end_at: Timestamp | string | null;
-  is_published: boolean;
+  is_archived: boolean;
   sort_order: number;
   created_at: Timestamp | string;
   updated_at: Timestamp | string;
-}
-
-export interface QrLink {
-  id: string;
-  title: string;
-  url: string;
-  description: string | null;
-  start_at: Timestamp | string | null;
-  end_at: Timestamp | string | null;
-  is_published: boolean;
-  sort_order: number;
-  created_at: Timestamp | string;
-  updated_at: Timestamp | string;
+  created_by: string;
+  updated_by: string;
 }
 
 export interface DisplaySettings {
@@ -77,5 +62,6 @@ export interface DisplaySettings {
   opening_hours_text: string | null;
   fallback_message: string | null;
   accent_color: string;
+  theme: 'light' | 'dark';
   updated_at: Timestamp | string;
 }

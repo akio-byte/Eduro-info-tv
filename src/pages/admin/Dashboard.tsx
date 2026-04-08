@@ -1,75 +1,57 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
-import { Megaphone, Calendar, Star, QrCode } from 'lucide-react';
+import { Megaphone, Calendar, ImageIcon, QrCode, FileText } from 'lucide-react';
 import { db, isMockFirebase } from '../../lib/firebase';
 import { collection, query, where, getCountFromServer } from 'firebase/firestore';
-import { mockAnnouncements, mockEvents, mockHighlights, mockQrLinks } from '../../lib/mock-data';
+import { useAuth } from '../../contexts/AuthContext';
 
 export function Dashboard() {
   const [stats, setStats] = useState({
     announcements: 0,
     events: 0,
-    highlights: 0,
+    media: 0,
     qrLinks: 0,
+    total: 0
   });
+  
+  const { orgId } = useAuth();
 
   useEffect(() => {
+    if (!orgId) return;
+
     async function fetchStats() {
       if (isMockFirebase) {
-        const now = new Date();
         setStats({
-          announcements: mockAnnouncements.filter(a => {
-            if (!a.is_published) return false;
-            if (a.start_at && new Date(a.start_at as string) > now) return false;
-            if (a.end_at && new Date(a.end_at as string) < now) return false;
-            return true;
-          }).length,
-          events: mockEvents.filter(e => {
-            if (!e.is_published) return false;
-            const eventDate = new Date(e.event_date);
-            if (eventDate < new Date(now.setHours(0, 0, 0, 0))) return false;
-            return true;
-          }).length,
-          highlights: mockHighlights.filter(h => {
-            if (!h.is_published) return false;
-            if (h.start_at && new Date(h.start_at as string) > now) return false;
-            if (h.end_at && new Date(h.end_at as string) < now) return false;
-            return true;
-          }).length,
-          qrLinks: mockQrLinks.filter(q => {
-            if (!q.is_published) return false;
-            if (q.start_at && new Date(q.start_at as string) > now) return false;
-            if (q.end_at && new Date(q.end_at as string) < now) return false;
-            return true;
-          }).length,
+          announcements: 1,
+          events: 0,
+          media: 1,
+          qrLinks: 0,
+          total: 2
         });
         return;
       }
 
       try {
-        const now = new Date();
-        
-        // Firestore doesn't support complex OR queries for counts easily without multiple queries or composite indexes
-        // For simplicity, we'll just count all published ones for now, or filter by date if possible.
-        // Actually, we can use multiple where clauses if they are on the same field or if we have indexes.
-        
-        const annQuery = query(collection(db, 'announcements'), where('is_published', '==', true));
-        const evQuery = query(collection(db, 'events'), where('is_published', '==', true));
-        const highQuery = query(collection(db, 'highlights'), where('is_published', '==', true));
-        const qrQuery = query(collection(db, 'qr_links'), where('is_published', '==', true));
+        const baseQuery = query(
+          collection(db, 'content_items'), 
+          where('org_id', '==', orgId),
+          where('is_archived', '==', false)
+        );
 
-        const [annSnap, evSnap, highSnap, qrSnap] = await Promise.all([
-          getCountFromServer(annQuery),
-          getCountFromServer(evQuery),
-          getCountFromServer(highQuery),
-          getCountFromServer(qrQuery),
+        const [annSnap, evSnap, mediaSnap, qrSnap, totalSnap] = await Promise.all([
+          getCountFromServer(query(baseQuery, where('type', '==', 'announcement'), where('is_published', '==', true))),
+          getCountFromServer(query(baseQuery, where('type', '==', 'event'), where('is_published', '==', true))),
+          getCountFromServer(query(baseQuery, where('type', '==', 'media'), where('is_published', '==', true))),
+          getCountFromServer(query(baseQuery, where('type', '==', 'qr'), where('is_published', '==', true))),
+          getCountFromServer(baseQuery)
         ]);
 
         setStats({
           announcements: annSnap.data().count,
           events: evSnap.data().count,
-          highlights: highSnap.data().count,
+          media: mediaSnap.data().count,
           qrLinks: qrSnap.data().count,
+          total: totalSnap.data().count
         });
       } catch (error) {
         console.error('Error fetching stats:', error);
@@ -77,7 +59,7 @@ export function Dashboard() {
     }
 
     fetchStats();
-  }, []);
+  }, [orgId]);
 
   const statCards = [
     {
@@ -90,44 +72,64 @@ export function Dashboard() {
       title: 'Julkaistut tapahtumat',
       value: stats.events,
       icon: Calendar,
-      color: 'text-green-500',
+      color: 'text-orange-500',
     },
     {
-      title: 'Aktiiviset nostot',
-      value: stats.highlights,
-      icon: Star,
-      color: 'text-yellow-500',
+      title: 'Aktiivinen media',
+      value: stats.media,
+      icon: ImageIcon,
+      color: 'text-purple-500',
     },
     {
-      title: 'QR-linkit näytöllä',
+      title: 'QR-linkit',
       value: stats.qrLinks,
       icon: QrCode,
-      color: 'text-purple-500',
+      color: 'text-indigo-500',
     },
   ];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Kojelauta</h1>
-        <p className="text-slate-500 mt-2">Yhteenveto InfoTV:n sisällöstä.</p>
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Kojelauta</h1>
+          <p className="text-slate-500 mt-2">Yhteenveto organisaatiosi InfoTV-sisällöstä.</p>
+        </div>
+        <div className="bg-white px-6 py-3 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="text-sm font-medium text-slate-500">Julkaisuja yhteensä</div>
+          <div className="text-2xl font-bold text-indigo-600">{stats.total}</div>
+        </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {statCards.map((stat) => (
-          <Card key={stat.title}>
+          <Card key={stat.title} className="hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-slate-500">
                 {stat.title}
               </CardTitle>
-              <stat.icon className={`h-4 w-4 ${stat.color}`} />
+              <stat.icon className={`h-5 w-5 ${stat.color}`} />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-slate-900">{stat.value}</div>
+              <div className="text-3xl font-bold text-slate-900">{stat.value}</div>
             </CardContent>
           </Card>
         ))}
       </div>
+
+      <Card className="bg-indigo-600 text-white overflow-hidden relative">
+        <CardContent className="p-8 relative z-10">
+          <div className="max-w-xl space-y-4">
+            <h2 className="text-2xl font-bold">Tervetuloa Eduro InfoTV:hen!</h2>
+            <p className="text-indigo-100 leading-relaxed">
+              Tämä on uusi, yksinkertaistettu versio hallintapaneelista. 
+              Kaikki sisällöt on nyt yhdistetty yhden "Julkaisut"-näkymän alle, 
+              mikä tekee InfoTV:n hallinnasta helpompaa ja nopeampaa.
+            </p>
+          </div>
+          <FileText className="absolute right-[-20px] bottom-[-20px] h-64 w-64 text-white/10 rotate-12" />
+        </CardContent>
+      </Card>
     </div>
   );
 }

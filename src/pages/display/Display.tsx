@@ -2,31 +2,20 @@ import { useState, useEffect } from 'react';
 import { db, isMockFirebase } from '../../lib/firebase';
 import { collection, onSnapshot, query, where, orderBy, doc, Timestamp } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-utils';
-import { mockAnnouncements, mockEvents, mockHighlights, mockQrLinks, mockSettings } from '../../lib/mock-data';
-import type { Announcement, Event, Highlight, QrLink, DisplaySettings as Settings } from '../../types/firestore';
+import { mockSettings } from '../../lib/mock-data';
+import type { ContentItem, DisplaySettings as Settings } from '../../types/firestore';
 import { format } from 'date-fns';
 import { fi } from 'date-fns/locale';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Clock, Calendar, MapPin, Info } from 'lucide-react';
-
-// Removed redundant type definitions as they are now imported from firestore.ts
-
-type ContentItem = 
-  | { type: 'announcement'; data: Announcement }
-  | { type: 'event'; data: Event }
-  | { type: 'highlight'; data: Highlight };
+import { Clock, Calendar, MapPin, Info, Megaphone, QrCode } from 'lucide-react';
 
 export function Display() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [qrLinks, setQrLinks] = useState<QrLink[]>([]);
   const [contentQueue, setContentQueue] = useState<ContentItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [events, setEvents] = useState<Event[]>([]);
-  const [highlights, setHighlights] = useState<Highlight[]>([]);
 
   // Update time every second
   useEffect(() => {
@@ -40,40 +29,58 @@ export function Display() {
       setSettings(mockSettings);
       
       const now = new Date();
-      setQrLinks(mockQrLinks.filter(q => {
-        if (!q.is_published) return false;
-        if (q.start_at && new Date(q.start_at as string) > now) return false;
-        if (q.end_at && new Date(q.end_at as string) < now) return false;
-        return true;
-      }));
+      const mockItems: ContentItem[] = [
+        {
+          id: '1',
+          org_id: 'default-org',
+          type: 'announcement',
+          title: 'Tervetuloa Eduroon!',
+          body: 'Tämä on esimerkkitiedote, joka näkyy InfoTV-näytöllä.',
+          media_url: null,
+          media_type: 'none',
+          event_date: null,
+          start_time: null,
+          end_time: null,
+          location: null,
+          qr_url: null,
+          publish_start: null,
+          publish_end: null,
+          duration_seconds: 15,
+          is_published: true,
+          is_archived: false,
+          sort_order: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          created_by: 'mock',
+          updated_by: 'mock'
+        },
+        {
+          id: '2',
+          org_id: 'default-org',
+          type: 'media',
+          title: 'Päivän kuva',
+          body: 'Tässä on hieno kuva Edurolta.',
+          media_url: 'https://picsum.photos/seed/eduro/1920/1080',
+          media_type: 'image',
+          event_date: null,
+          start_time: null,
+          end_time: null,
+          location: null,
+          qr_url: null,
+          publish_start: null,
+          publish_end: null,
+          duration_seconds: 10,
+          is_published: true,
+          is_archived: false,
+          sort_order: 1,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          created_by: 'mock',
+          updated_by: 'mock'
+        }
+      ];
       
-      const queue: ContentItem[] = [];
-      if (mockSettings.show_highlights) {
-        mockHighlights.filter(h => {
-          if (!h.is_published) return false;
-          if (h.start_at && new Date(h.start_at as string) > now) return false;
-          if (h.end_at && new Date(h.end_at as string) < now) return false;
-          return true;
-        }).forEach(h => queue.push({ type: 'highlight', data: h }));
-      }
-      if (mockSettings.show_announcements) {
-        mockAnnouncements.filter(a => {
-          if (!a.is_published) return false;
-          if (a.start_at && new Date(a.start_at as string) > now) return false;
-          if (a.end_at && new Date(a.end_at as string) < now) return false;
-          return true;
-        }).forEach(a => queue.push({ type: 'announcement', data: a }));
-      }
-      if (mockSettings.show_events) {
-        mockEvents.filter(e => {
-          if (!e.is_published) return false;
-          const eventDate = new Date(e.event_date);
-          if (eventDate < new Date(now.setHours(0, 0, 0, 0))) return false;
-          return true;
-        }).forEach(e => queue.push({ type: 'event', data: e }));
-      }
-      
-      setContentQueue(queue);
+      setContentQueue(mockItems);
       setLoading(false);
       return;
     }
@@ -89,7 +96,6 @@ export function Display() {
         setSettings({
           id: doc.id,
           ...d,
-          created_at: d.created_at instanceof Timestamp ? d.created_at.toDate().toISOString() : d.created_at,
           updated_at: d.updated_at instanceof Timestamp ? d.updated_at.toDate().toISOString() : d.updated_at,
         } as any as Settings);
       } else {
@@ -99,368 +105,268 @@ export function Display() {
     }, (error) => handleFirestoreError(error, OperationType.GET, 'display_settings/default'));
     unsubscribers.push(unsubSettings);
 
-    // QR Links
-    const qrQuery = query(collection(db, 'qr_links'), where('is_published', '==', true), orderBy('sort_order'));
-    const unsubQr = onSnapshot(qrQuery, (snapshot) => {
+    // Content Items
+    const contentQuery = query(
+      collection(db, 'content_items'), 
+      where('is_published', '==', true), 
+      where('is_archived', '==', false),
+      orderBy('sort_order', 'asc'),
+      orderBy('created_at', 'desc')
+    );
+    
+    const unsubContent = onSnapshot(contentQuery, (snapshot) => {
       const now = new Date();
-      const links = snapshot.docs.map(doc => {
+      const items = snapshot.docs.map(doc => {
         const d = doc.data();
         return {
           id: doc.id,
           ...d,
-          start_at: d.start_at instanceof Timestamp ? d.start_at.toDate().toISOString() : d.start_at,
-          end_at: d.end_at instanceof Timestamp ? d.end_at.toDate().toISOString() : d.end_at,
-        } as QrLink;
-      }).filter(q => {
-        const startAt = q.start_at ? new Date(q.start_at as string) : null;
-        const endAt = q.end_at ? new Date(q.end_at as string) : null;
+          publish_start: d.publish_start instanceof Timestamp ? d.publish_start.toDate().toISOString() : d.publish_start,
+          publish_end: d.publish_end instanceof Timestamp ? d.publish_end.toDate().toISOString() : d.publish_end,
+          created_at: d.created_at instanceof Timestamp ? d.created_at.toDate().toISOString() : d.created_at,
+          updated_at: d.updated_at instanceof Timestamp ? d.updated_at.toDate().toISOString() : d.updated_at,
+        } as ContentItem;
+      }).filter(item => {
+        const startAt = item.publish_start ? new Date(item.publish_start as string) : null;
+        const endAt = item.publish_end ? new Date(item.publish_end as string) : null;
         if (startAt && startAt > now) return false;
         if (endAt && endAt < now) return false;
         return true;
       });
-      setQrLinks(links);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'qr_links'));
-    unsubscribers.push(unsubQr);
-
-    // Announcements
-    const annQuery = query(collection(db, 'announcements'), where('is_published', '==', true), orderBy('created_at', 'desc'));
-    const unsubAnn = onSnapshot(annQuery, (snapshot) => {
-      const now = new Date();
-      const data = snapshot.docs.map(doc => {
-        const d = doc.data();
-        return {
-          id: doc.id,
-          ...d,
-          start_at: d.start_at instanceof Timestamp ? d.start_at.toDate().toISOString() : d.start_at,
-          end_at: d.end_at instanceof Timestamp ? d.end_at.toDate().toISOString() : d.end_at,
-        } as Announcement;
-      }).filter(a => {
-        const startAt = a.start_at ? new Date(a.start_at as string) : null;
-        const endAt = a.end_at ? new Date(a.end_at as string) : null;
-        if (startAt && startAt > now) return false;
-        if (endAt && endAt < now) return false;
-        return true;
-      });
-      setAnnouncements(data);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'announcements'));
-    unsubscribers.push(unsubAnn);
-
-    // Events
-    const evQuery = query(collection(db, 'events'), where('is_published', '==', true), orderBy('event_date'));
-    const unsubEv = onSnapshot(evQuery, (snapshot) => {
-      const now = new Date();
-      const data = snapshot.docs.map(doc => {
-        const d = doc.data();
-        return {
-          id: doc.id,
-          ...d,
-          // event_date is stored as ISO string in this app's current logic
-        } as Event;
-      }).filter(e => {
-        const eventDate = new Date(e.event_date);
-        if (eventDate < new Date(now.setHours(0, 0, 0, 0))) return false;
-        return true;
-      });
-      setEvents(data);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'events'));
-    unsubscribers.push(unsubEv);
-
-    // Highlights
-    const highQuery = query(collection(db, 'highlights'), where('is_published', '==', true), orderBy('sort_order'));
-    const unsubHigh = onSnapshot(highQuery, (snapshot) => {
-      const now = new Date();
-      const data = snapshot.docs.map(doc => {
-        const d = doc.data();
-        return {
-          id: doc.id,
-          ...d,
-          start_at: d.start_at instanceof Timestamp ? d.start_at.toDate().toISOString() : d.start_at,
-          end_at: d.end_at instanceof Timestamp ? d.end_at.toDate().toISOString() : d.end_at,
-        } as Highlight;
-      }).filter(h => {
-        const startAt = h.start_at ? new Date(h.start_at as string) : null;
-        const endAt = h.end_at ? new Date(h.end_at as string) : null;
-        if (startAt && startAt > now) return false;
-        if (endAt && endAt < now) return false;
-        return true;
-      });
-      setHighlights(data);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'highlights'));
-    unsubscribers.push(unsubHigh);
+      setContentQueue(items);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'content_items'));
+    unsubscribers.push(unsubContent);
 
     return () => unsubscribers.forEach(unsub => unsub());
   }, []);
 
-  // Combined effect to update the content queue when any of the data sources change
-  useEffect(() => {
-    if (!settings) return;
-    
-    const queue: ContentItem[] = [];
-    if (settings.show_highlights) {
-      highlights.forEach(h => queue.push({ type: 'highlight', data: h }));
-    }
-    if (settings.show_announcements) {
-      announcements.forEach(a => queue.push({ type: 'announcement', data: a }));
-    }
-    if (settings.show_events) {
-      events.forEach(e => queue.push({ type: 'event', data: e }));
-    }
-    
-    setContentQueue(queue);
-    setCurrentIndex(0); // Reset to start when queue changes
-  }, [announcements, events, highlights, settings]);
-
   // Handle content rotation
   useEffect(() => {
-    if (contentQueue.length <= 1 || !settings) return;
+    if (contentQueue.length <= 1) return;
 
-    const interval = (settings.rotation_interval_seconds || 15) * 1000;
-    const rotationTimer = setInterval(() => {
+    const currentItem = contentQueue[currentIndex];
+    const duration = (currentItem?.duration_seconds || 15) * 1000;
+    
+    const rotationTimer = setTimeout(() => {
       setCurrentIndex((prev) => (prev + 1) % contentQueue.length);
-    }, interval);
+    }, duration);
 
-    return () => clearInterval(rotationTimer);
-  }, [contentQueue.length, settings?.rotation_interval_seconds]);
+    return () => clearTimeout(rotationTimer);
+  }, [currentIndex, contentQueue]);
 
   if (loading || !settings) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-slate-950 text-slate-400">
-        <p className="text-2xl">Ladataan InfoTV...</p>
+        <p className="text-2xl animate-pulse">Ladataan InfoTV...</p>
       </div>
     );
   }
 
   const currentContent = contentQueue[currentIndex];
 
+  const isLight = settings.theme === 'light';
+
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-950 text-slate-50 font-sans selection:bg-slate-800">
+    <div className={`flex h-screen w-screen overflow-hidden font-sans selection:bg-slate-800 transition-colors duration-700 ${
+      isLight ? 'bg-slate-50 text-slate-900' : 'bg-slate-950 text-slate-50'
+    }`}>
       {/* Main Content Area */}
       <main className="flex-1 relative flex flex-col">
         {/* Header */}
-        <header className="flex items-center justify-between px-12 py-8 z-10">
-          <div className="flex items-center space-x-4">
+        <header className="flex items-center justify-between px-16 py-10 z-10">
+          <div className="flex items-center space-x-6">
             <div 
-              className="h-12 w-12 rounded-xl flex items-center justify-center text-white font-bold text-2xl"
-              style={{ backgroundColor: settings.accent_color || '#0ea5e9' }}
+              className="h-14 w-14 rounded-2xl flex items-center justify-center text-white font-bold text-3xl shadow-lg shadow-indigo-500/20"
+              style={{ backgroundColor: settings.accent_color || '#4f46e5' }}
             >
               {(settings.org_name || 'E').charAt(0)}
             </div>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">{settings.org_name || 'Eduro'}</h1>
+              <h1 className={`text-4xl font-bold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                {settings.org_name || 'Eduro'}
+              </h1>
               {settings.welcome_text && (
-                <p className="text-lg text-slate-400">{settings.welcome_text}</p>
+                <p className={`text-xl font-medium ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                  {settings.welcome_text}
+                </p>
               )}
             </div>
           </div>
           <div className="text-right">
-            <div className="text-5xl font-bold tracking-tighter">
+            <div className={`text-6xl font-bold tracking-tighter tabular-nums ${isLight ? 'text-slate-900' : 'text-white'}`}>
               {format(currentTime, 'HH:mm')}
             </div>
-            <div className="text-xl text-slate-400 mt-1 capitalize">
+            <div className={`text-2xl mt-1 capitalize font-medium ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
               {format(currentTime, 'EEEE, d. MMMM yyyy', { locale: fi })}
             </div>
           </div>
         </header>
 
         {/* Content Rotation Area */}
-        <div className="flex-1 relative overflow-hidden px-12 pb-12">
+        <div className="flex-1 relative overflow-hidden px-16 pb-16">
           <AnimatePresence mode="wait">
-            {contentQueue.length === 0 ? (
+            {!currentContent ? (
               <motion.div
                 key="empty"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-                className="flex h-full flex-col items-center justify-center text-center space-y-6"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex h-full flex-col items-center justify-center text-center space-y-8"
               >
-                <Info className="h-24 w-24 text-slate-800" />
-                <h2 className="text-4xl font-medium text-slate-500 max-w-3xl leading-relaxed">
+                <div className={`p-8 rounded-full border ${isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'}`}>
+                  <Info className={`h-20 w-20 ${isLight ? 'text-slate-200' : 'text-slate-700'}`} />
+                </div>
+                <h2 className={`text-4xl font-medium max-w-3xl leading-relaxed ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
                   {settings.fallback_message || 'Ei uusia tiedotteita tällä hetkellä.'}
                 </h2>
               </motion.div>
-            ) : currentContent.type === 'highlight' ? (
-              <motion.div
-                key={`highlight-${currentContent.data.id}`}
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 1.02 }}
-                transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-                className="flex h-full overflow-hidden rounded-3xl bg-slate-900 border border-slate-800"
-              >
-                {currentContent.data.image_url && (
-                  <div className="w-1/2 relative">
-                    <div className="absolute inset-0 bg-gradient-to-r from-slate-900/20 to-slate-900/80 z-10" />
-                    <img 
-                      src={currentContent.data.image_url} 
-                      alt="" 
-                      className="absolute inset-0 h-full w-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-                )}
-                <div className={`flex flex-col justify-center p-16 ${currentContent.data.image_url ? 'w-1/2' : 'w-full items-center text-center'}`}>
-                  {currentContent.data.subtitle && (
-                    <span 
-                      className="text-xl font-semibold tracking-wider uppercase mb-4"
-                      style={{ color: settings.accent_color || '#0ea5e9' }}
-                    >
-                      {currentContent.data.subtitle}
-                    </span>
-                  )}
-                  <h2 className="text-6xl font-bold leading-tight mb-8">
-                    {currentContent.data.title}
-                  </h2>
-                  {currentContent.data.body && (
-                    <p className="text-2xl text-slate-300 leading-relaxed max-w-3xl">
-                      {currentContent.data.body}
-                    </p>
-                  )}
-                  {currentContent.data.cta_label && (
-                    <div className="mt-12 inline-flex items-center rounded-full px-8 py-4 text-xl font-semibold" style={{ backgroundColor: settings.accent_color || '#0ea5e9', color: '#fff' }}>
-                      {currentContent.data.cta_label}
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            ) : currentContent.type === 'announcement' ? (
-              <motion.div
-                key={`announcement-${currentContent.data.id}`}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-                className="flex h-full flex-col justify-center p-16 rounded-3xl bg-slate-900 border border-slate-800 relative overflow-hidden"
-              >
-                {currentContent.data.priority === 'high' && (
-                  <div className="absolute top-0 left-0 w-full h-2 bg-red-500" />
-                )}
-                <div className="flex items-center space-x-4 mb-8">
-                  <div className="rounded-full bg-slate-800 p-4">
-                    <Info className="h-10 w-10 text-slate-300" />
-                  </div>
-                  <span className="text-2xl font-medium text-slate-400 tracking-wide uppercase">
-                    Tiedote
-                  </span>
-                </div>
-                <h2 className="text-6xl font-bold leading-tight mb-10 text-slate-50">
-                  {currentContent.data.title}
-                </h2>
-                <p className="text-3xl text-slate-300 leading-relaxed max-w-5xl whitespace-pre-wrap">
-                  {currentContent.data.body}
-                </p>
-              </motion.div>
             ) : (
               <motion.div
-                key={`event-${currentContent.data.id}`}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-                className="flex h-full flex-col justify-center p-16 rounded-3xl bg-slate-900 border border-slate-800 relative overflow-hidden"
+                key={currentContent.id}
+                initial={{ opacity: 0, scale: 0.98, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 1.02, y: -10 }}
+                transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+                className={`flex h-full overflow-hidden rounded-[2.5rem] border shadow-2xl ${
+                  isLight 
+                    ? 'bg-white border-slate-200 shadow-slate-200/50' 
+                    : 'bg-slate-900 border-slate-800 shadow-black/50'
+                }`}
               >
-                <div className="absolute top-0 left-0 w-full h-2" style={{ backgroundColor: settings.accent_color || '#0ea5e9' }} />
-                <div className="flex items-center space-x-4 mb-8">
-                  <div className="rounded-full bg-slate-800 p-4">
-                    <Calendar className="h-10 w-10 text-slate-300" />
+                {/* Media Side (if any) */}
+                {currentContent.media_url && (
+                  <div className={`relative ${currentContent.body ? 'w-1/2' : 'w-full'}`}>
+                    <div className={`absolute inset-0 z-10 ${
+                      isLight 
+                        ? 'bg-gradient-to-r from-white/10 to-white/40' 
+                        : 'bg-gradient-to-r from-slate-900/10 to-slate-900/40'
+                    }`} />
+                    {currentContent.media_type === 'video' ? (
+                      <video 
+                        src={currentContent.media_url} 
+                        autoPlay 
+                        muted 
+                        loop 
+                        className="absolute inset-0 h-full w-full object-cover"
+                      />
+                    ) : (
+                      <img 
+                        src={currentContent.media_url} 
+                        alt="" 
+                        className="absolute inset-0 h-full w-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    )}
+                    {/* Media-only title overlay */}
+                    {!currentContent.body && (
+                      <div className={`absolute bottom-0 left-0 right-0 p-20 z-20 ${
+                        isLight 
+                          ? 'bg-gradient-to-t from-white/90 to-transparent' 
+                          : 'bg-gradient-to-t from-slate-950/90 to-transparent'
+                      }`}>
+                        <h2 className={`text-7xl font-bold leading-tight drop-shadow-lg ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                          {currentContent.title}
+                        </h2>
+                      </div>
+                    )}
                   </div>
-                  <span className="text-2xl font-medium text-slate-400 tracking-wide uppercase">
-                    Tuleva tapahtuma
-                  </span>
-                </div>
-                <h2 className="text-6xl font-bold leading-tight mb-12 text-slate-50">
-                  {currentContent.data.title}
-                </h2>
-                
-                <div className="grid grid-cols-2 gap-12 mb-12">
-                  <div className="flex items-center space-x-6 bg-slate-950/50 p-8 rounded-2xl border border-slate-800/50">
-                    <Clock className="h-12 w-12" style={{ color: settings.accent_color || '#0ea5e9' }} />
-                    <div>
-                      <div className="text-xl text-slate-400 mb-1">Aika</div>
-                      <div className="text-3xl font-semibold">
-                        {format(new Date(currentContent.data.event_date), 'd.M.yyyy')}
-                        {(currentContent.data.start_time || currentContent.data.end_time) && (
-                          <span className="ml-4 text-slate-300">
-                            klo {currentContent.data.start_time} {currentContent.data.end_time ? `- ${currentContent.data.end_time}` : ''}
-                          </span>
+                )}
+
+                {/* Text Side */}
+                {currentContent.body && (
+                  <div className={`flex flex-col justify-center p-20 ${currentContent.media_url ? 'w-1/2' : 'w-full max-w-6xl mx-auto'}`}>
+                    <div className="flex items-center gap-4 mb-10">
+                      <div className={`p-3 rounded-xl ${isLight ? 'bg-slate-100 text-slate-400' : 'bg-slate-800/50 text-slate-400'}`}>
+                        {currentContent.type === 'announcement' ? <Megaphone className="h-8 w-8" /> :
+                         currentContent.type === 'event' ? <Calendar className="h-8 w-8" /> :
+                         currentContent.type === 'qr' ? <QrCode className="h-8 w-8" /> :
+                         <Info className="h-8 w-8" />}
+                      </div>
+                      <span className={`text-2xl font-bold tracking-widest uppercase ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {currentContent.type === 'announcement' ? 'Tiedote' :
+                         currentContent.type === 'event' ? 'Tapahtuma' :
+                         currentContent.type === 'qr' ? 'Pikalinkki' :
+                         'Julkaisu'}
+                      </span>
+                    </div>
+
+                    <h2 className={`text-7xl font-bold leading-[1.1] mb-12 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                      {currentContent.title}
+                    </h2>
+
+                    <div className={`text-3xl leading-relaxed whitespace-pre-wrap font-medium ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+                      {currentContent.body}
+                    </div>
+
+                    {currentContent.type === 'event' && currentContent.event_date && (
+                      <div className="mt-16 grid grid-cols-2 gap-8">
+                        <div className={`flex items-center space-x-6 p-8 rounded-3xl border ${
+                          isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/40 border-slate-800/50'
+                        }`}>
+                          <Clock className="h-12 w-12" style={{ color: settings.accent_color || '#4f46e5' }} />
+                          <div>
+                            <div className={`text-xl mb-1 font-bold uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Aika</div>
+                            <div className={`text-3xl font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                              {format(new Date(currentContent.event_date), 'd.M.yyyy')}
+                              {currentContent.start_time && (
+                                <span className={`ml-4 ${isLight ? 'text-slate-400' : 'text-slate-400'}`}>klo {currentContent.start_time}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        {currentContent.location && (
+                          <div className={`flex items-center space-x-6 p-8 rounded-3xl border ${
+                            isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/40 border-slate-800/50'
+                          }`}>
+                            <MapPin className="h-12 w-12" style={{ color: settings.accent_color || '#4f46e5' }} />
+                            <div>
+                              <div className={`text-xl mb-1 font-bold uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Paikka</div>
+                              <div className={`text-3xl font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>{currentContent.location}</div>
+                            </div>
+                          </div>
                         )}
                       </div>
-                    </div>
-                  </div>
-                  
-                  {currentContent.data.location && (
-                    <div className="flex items-center space-x-6 bg-slate-950/50 p-8 rounded-2xl border border-slate-800/50">
-                      <MapPin className="h-12 w-12" style={{ color: settings.accent_color || '#0ea5e9' }} />
-                      <div>
-                        <div className="text-xl text-slate-400 mb-1">Paikka</div>
-                        <div className="text-3xl font-semibold">{currentContent.data.location}</div>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                    )}
 
-                {currentContent.data.description && (
-                  <p className="text-3xl text-slate-300 leading-relaxed max-w-4xl">
-                    {currentContent.data.description}
-                  </p>
+                    {currentContent.qr_url && (
+                      <div className={`mt-16 flex items-center gap-10 p-8 rounded-3xl border self-start ${
+                        isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/5 border-white/10'
+                      }`}>
+                        <div className="bg-white p-3 rounded-2xl shadow-sm">
+                          <QRCodeSVG value={currentContent.qr_url} size={140} />
+                        </div>
+                        <div className="space-y-2">
+                          <p className={`text-2xl font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>Lue lisää</p>
+                          <p className={`text-xl ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Skannaa QR-koodi puhelimellasi</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
               </motion.div>
             )}
           </AnimatePresence>
           
           {/* Progress Bar */}
-          {contentQueue.length > 1 && (
-            <div className="absolute bottom-12 left-12 right-12 h-1 bg-slate-800 rounded-full overflow-hidden">
+          {contentQueue.length > 1 && currentContent && (
+            <div className={`absolute bottom-16 left-16 right-16 h-1.5 rounded-full overflow-hidden backdrop-blur-sm ${
+              isLight ? 'bg-slate-200/50' : 'bg-slate-900/50'
+            }`}>
               <motion.div 
-                key={`progress-${currentIndex}`}
-                className="h-full"
-                style={{ backgroundColor: settings.accent_color || '#0ea5e9' }}
+                key={`progress-${currentContent.id}-${currentIndex}`}
+                className="h-full shadow-[0_0_10px_rgba(79,70,229,0.5)]"
+                style={{ backgroundColor: settings.accent_color || '#4f46e5' }}
                 initial={{ width: '0%' }}
                 animate={{ width: '100%' }}
-                transition={{ duration: settings.rotation_interval_seconds || 15, ease: "linear" }}
+                transition={{ duration: currentContent.duration_seconds || 15, ease: "linear" }}
               />
             </div>
           )}
         </div>
       </main>
 
-      {/* Sidebar / Info Panel */}
-      {(settings.show_qr_links || settings.show_opening_hours) && (
-        <aside className="w-96 bg-slate-900 border-l border-slate-800 flex flex-col z-20">
-          <div className="flex-1 p-10 flex flex-col gap-12 overflow-y-auto">
-            
-            {settings.show_opening_hours && settings.opening_hours_text && (
-              <div className="space-y-4">
-                <h3 className="text-xl font-semibold tracking-wide text-slate-400 uppercase">Aukioloajat</h3>
-                <div className="text-2xl font-medium text-slate-200 whitespace-pre-wrap">
-                  {settings.opening_hours_text}
-                </div>
-              </div>
-            )}
-
-            {settings.show_qr_links && qrLinks.length > 0 && (
-              <div className="space-y-8">
-                <h3 className="text-xl font-semibold tracking-wide text-slate-400 uppercase">Pikalinkit</h3>
-                <div className="space-y-8">
-                  {qrLinks.map((link) => (
-                    <div key={link.id} className="flex flex-col space-y-4 bg-slate-950/50 p-6 rounded-2xl border border-slate-800/50">
-                      <div className="bg-white p-4 rounded-xl self-start">
-                        <QRCodeSVG value={link.url} size={120} />
-                      </div>
-                      <div>
-                        <h4 className="text-xl font-semibold text-slate-200">{link.title}</h4>
-                        {link.description && (
-                          <p className="text-slate-400 mt-1">{link.description}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </aside>
-      )}
+      {/* Sidebar - Optional, only if settings say so and we have QR links specifically for sidebar */}
+      {/* For V1, we've moved QR links into the main content rotation for better visibility */}
     </div>
   );
 }
