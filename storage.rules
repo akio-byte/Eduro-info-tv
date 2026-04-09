@@ -10,9 +10,14 @@ service firebase.storage {
         firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    function isEditor() {
+      return isAuthenticated() && 
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'editor'];
+    }
+
     match /content/{orgId}/{allPaths=**} {
       allow read: if true;
-      allow write: if isAuthenticated() && (
+      allow write: if isEditor() && (
         isAdmin() || 
         firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.org_id == orgId
       );

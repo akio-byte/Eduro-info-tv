@@ -148,12 +148,22 @@ service cloud.firestore {
 
     function isValidContentItem(data) {
       return data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
-             data.type in ['announcement', 'event', 'media', 'qr', 'mixed'] &&
+             data.type in ['announcement', 'event', 'media', 'qr', 'mixed', 'rss'] &&
              data.org_id is string &&
              data.is_published is bool &&
              data.is_archived is bool &&
+             (!('body' in data) || data.body == null || data.body is string) &&
              (!('media_url' in data) || data.media_url == null || data.media_url is string) &&
              (!('media_type' in data) || data.media_type in ['none', 'image', 'video']) &&
+             (!('rss_url' in data) || data.rss_url == null || isValidUrl(data.rss_url)) &&
+             (!('duration_seconds' in data) || data.duration_seconds is int) &&
+             (!('sort_order' in data) || data.sort_order is int) &&
+             (!('event_date' in data) || data.event_date == null || data.event_date is string) &&
+             (!('start_time' in data) || data.start_time == null || data.start_time is string) &&
+             (!('location' in data) || data.location == null || data.location is string) &&
+             (!('qr_url' in data) || data.qr_url == null || isValidUrl(data.qr_url)) &&
+             (!('updated_by' in data) || data.updated_by is string) &&
+             (!('created_by' in data) || data.created_by is string) &&
              (data.created_at is timestamp || !('created_at' in data)) &&
              (data.updated_at is timestamp || !('updated_at' in data)) &&
              data.keys().hasAll(['title', 'type', 'org_id', 'is_published', 'is_archived']);

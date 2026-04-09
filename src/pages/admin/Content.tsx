@@ -215,8 +215,8 @@ export function Content() {
       org_id: orgId,
       updated_at: serverTimestamp() as any,
       updated_by: user.uid,
-      publish_start: rest.publish_start ? Timestamp.fromDate(new Date(rest.publish_start as string)) : null,
-      publish_end: rest.publish_end ? Timestamp.fromDate(new Date(rest.publish_end as string)) : null,
+      publish_start: (rest.publish_start && rest.publish_start !== '') ? Timestamp.fromDate(new Date(rest.publish_start as string)) : null,
+      publish_end: (rest.publish_end && rest.publish_end !== '') ? Timestamp.fromDate(new Date(rest.publish_end as string)) : null,
     };
 
     // Ensure numeric fields are numbers
