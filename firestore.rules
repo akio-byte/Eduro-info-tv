@@ -98,19 +98,15 @@ service cloud.firestore {
     }
     
     function isAdmin() {
-      return isAuthenticated() && (
-        request.auth.token.email == "aki.oksala@gmail.com" ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
-      );
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
     
     function isEditor() {
-      return isAuthenticated() && (
-        request.auth.token.email == "aki.oksala@gmail.com" ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'editor'])
-      );
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'editor'];
     }
 
     function getUserOrg() {
@@ -120,10 +116,7 @@ service cloud.firestore {
     }
 
     function isOrgMember(orgId) {
-      return isAuthenticated() && (
-        request.auth.token.email == "aki.oksala@gmail.com" ||
-        getUserOrg() == orgId
-      );
+      return isAuthenticated() && getUserOrg() == orgId;
     }
     
     function isValidEmail(email) {
@@ -183,26 +176,20 @@ service cloud.firestore {
     // ===============================================================
 
     match /users/{userId} {
-      allow read: if isAuthenticated() && (
-        isOwner(userId) || 
-        request.auth.token.email == "aki.oksala@gmail.com" ||
-        (isAdmin() && getUserOrg() == resource.data.org_id)
-      );
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
       
       allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && (
         request.resource.data.role == 'editor' || 
-        request.auth.token.email == "aki.oksala@gmail.com" ||
         !exists(/databases/$(database)/documents/users/$(request.auth.uid)) ||
         isAdmin()
       );
       
       allow update: if isAuthenticated() && isValidUser(request.resource.data) && (
-        request.auth.token.email == "aki.oksala@gmail.com" ||
         (isAdmin() && getUserOrg() == resource.data.org_id) || 
         (isOwner(userId) && request.resource.data.role == resource.data.role && request.resource.data.org_id == resource.data.org_id)
       );
       
-      allow delete: if (request.auth.token.email == "aki.oksala@gmail.com" || isAdmin()) && userId != request.auth.uid && (request.auth.token.email == "aki.oksala@gmail.com" || getUserOrg() == resource.data.org_id);
+      allow delete: if isAdmin() && userId != request.auth.uid && getUserOrg() == resource.data.org_id;
     }
 
     match /invitations/{invitationId} {
@@ -211,21 +198,15 @@ service cloud.firestore {
         request.auth.token.email == resource.data.email
       );
       
-      allow create: if isAdmin() && isValidInvitation(request.resource.data) && (
-        request.auth.token.email == "aki.oksala@gmail.com" ||
-        request.resource.data.org_id == getUserOrg()
-      );
+      allow create: if isAdmin() && isValidInvitation(request.resource.data) && 
+        request.resource.data.org_id == getUserOrg();
       
       allow update: if isAuthenticated() && (
-        request.auth.token.email == "aki.oksala@gmail.com" ||
         (isAdmin() && getUserOrg() == resource.data.org_id) ||
         (request.auth.token.email == resource.data.email && request.resource.data.status == 'accepted')
       );
       
-      allow delete: if isAdmin() && (
-        request.auth.token.email == "aki.oksala@gmail.com" ||
-        getUserOrg() == resource.data.org_id
-      );
+      allow delete: if isAdmin() && getUserOrg() == resource.data.org_id;
     }
 
     match /content_items/{itemId} {
@@ -233,26 +214,6 @@ service cloud.firestore {
       allow create: if isEditor() && isValidContentItem(request.resource.data) && isOrgMember(request.resource.data.org_id);
       allow update: if isEditor() && isValidContentItem(request.resource.data) && isOrgMember(resource.data.org_id) && isOrgMember(request.resource.data.org_id);
       allow delete: if isEditor() && isOrgMember(resource.data.org_id);
-    }
-
-    match /announcements/{announcementId} {
-      allow read: if true;
-      allow write: if isEditor();
-    }
-
-    match /events/{eventId} {
-      allow read: if true;
-      allow write: if isEditor();
-    }
-
-    match /highlights/{highlightId} {
-      allow read: if true;
-      allow write: if isEditor();
-    }
-
-    match /qr_links/{qrLinkId} {
-      allow read: if true;
-      allow write: if isEditor();
     }
 
     match /display_settings/{settingsId} {

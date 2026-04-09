@@ -16,6 +16,7 @@ import {
 import { handleFirestoreError, OperationType } from '../../lib/firestore-utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/ui/Button';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Textarea } from '../../components/ui/Textarea';
@@ -55,6 +56,7 @@ export function Content() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<ContentType | 'all'>('all');
+  const [filterStatus, setFilterStatus] = useState<'active' | 'archived'>('active');
   const [isEditing, setIsEditing] = useState(false);
   const [currentItem, setCurrentItem] = useState<Partial<ContentItem> | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -100,7 +102,7 @@ export function Content() {
     const q = query(
       collection(db, 'content_items'),
       where('org_id', '==', orgId),
-      where('is_archived', '==', false),
+      where('is_archived', '==', filterStatus === 'archived'),
       orderBy('created_at', 'desc')
     );
 
@@ -118,7 +120,7 @@ export function Content() {
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'content_items'));
 
     return () => unsubscribe();
-  }, [orgId]);
+  }, [orgId, filterStatus]);
 
   const handleCreate = () => {
     setCurrentItem({
@@ -205,13 +207,12 @@ export function Content() {
     if (!currentItem || !user || !orgId) return;
 
     // Clean up data for Firestore
-    // We remove fields that shouldn't be sent as strings or are managed separately
-    const { id, created_at, updated_at, ...rest } = currentItem as any;
+    const { id, created_at, updated_at, ...rest } = currentItem;
     
-    const data: any = {
+    const data: Partial<ContentItem> = {
       ...rest,
       org_id: orgId,
-      updated_at: serverTimestamp(),
+      updated_at: serverTimestamp() as any,
       updated_by: user.uid,
       publish_start: rest.publish_start ? Timestamp.fromDate(new Date(rest.publish_start as string)) : null,
       publish_end: rest.publish_end ? Timestamp.fromDate(new Date(rest.publish_end as string)) : null,
@@ -296,12 +297,33 @@ export function Content() {
     }
   };
 
-  const filteredItems = items.filter(item => {
-    const matchesSearch = item.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         (item.body?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
-    const matchesType = filterType === 'all' || item.type === filterType;
-    return matchesSearch && matchesType;
-  });
+  const handleRestore = async (id: string) => {
+    if (isMockFirebase) {
+      setItems(prev => prev.filter(i => i.id !== id));
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, 'content_items', id), {
+        is_archived: false,
+        is_published: false,
+        updated_at: serverTimestamp()
+      });
+      setMessage({ type: 'success', text: 'Julkaisu palautettu arkistosta.' });
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Palautus epäonnistui.' });
+      handleFirestoreError(error, OperationType.UPDATE, `content_items/${id}`);
+    }
+  };
+
+  const filteredItems = React.useMemo(() => {
+    return items.filter(item => {
+      const matchesSearch = item.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                           (item.body?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
+      const matchesType = filterType === 'all' || item.type === filterType;
+      return matchesSearch && matchesType;
+    });
+  }, [items, searchTerm, filterType]);
 
   if (isEditing && currentItem) {
     return (
@@ -631,14 +653,38 @@ export function Content() {
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">Julkaisut</h1>
           <p className="text-slate-500 mt-2">Hallitse InfoTV:n sisältöä yhdestä paikasta.</p>
         </div>
-        <Button onClick={handleCreate} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
-          <Plus className="h-5 w-5" />
-          Uusi julkaisu
-        </Button>
+        <div className="flex gap-3">
+          <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
+            <Button 
+              variant={filterStatus === 'active' ? 'default' : 'ghost'} 
+              size="sm"
+              onClick={() => setFilterStatus('active')}
+              className="h-8"
+            >
+              Aktiiviset
+            </Button>
+            <Button 
+              variant={filterStatus === 'archived' ? 'default' : 'ghost'} 
+              size="sm"
+              onClick={() => setFilterStatus('archived')}
+              className="h-8"
+            >
+              Arkisto
+            </Button>
+          </div>
+          <Button onClick={handleCreate} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
+            <Plus className="h-5 w-5" />
+            Uusi julkaisu
+          </Button>
+        </div>
       </div>
 
       {message && (
-        <div className={`p-4 rounded-md ${message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+        <div 
+          role="alert" 
+          aria-live="polite"
+          className={`p-4 rounded-md ${message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}
+        >
           {message.text}
         </div>
       )}
@@ -678,7 +724,31 @@ export function Content() {
 
       <div className="grid gap-6">
         {loading ? (
-          <div className="text-center py-12 text-slate-500">Ladataan julkaisuja...</div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Card key={i} className="flex flex-col h-[400px]">
+                <CardHeader className="p-4 pb-2">
+                  <div className="flex items-center justify-between">
+                    <Skeleton className="h-6 w-24" />
+                    <Skeleton className="h-4 w-16" />
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4 pt-2 flex-1 space-y-3">
+                  <Skeleton className="h-6 w-3/4" />
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="aspect-video w-full rounded-lg" />
+                </CardContent>
+                <div className="p-4 pt-0 border-t border-slate-50 flex justify-between items-center">
+                  <Skeleton className="h-3 w-24" />
+                  <div className="flex gap-1">
+                    <Skeleton className="h-8 w-8 rounded-md" />
+                    <Skeleton className="h-8 w-8 rounded-md" />
+                    <Skeleton className="h-8 w-8 rounded-md" />
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
         ) : filteredItems.length === 0 ? (
           <Card className="border-dashed">
             <CardContent className="py-20 text-center space-y-4">
@@ -759,13 +829,43 @@ export function Content() {
                     Päivitetty {format(new Date(item.updated_at), 'd.M. HH:mm', { locale: fi })}
                   </span>
                   <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600" onClick={() => handleEdit(item)}>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-slate-400 hover:text-indigo-600" 
+                      onClick={() => handleEdit(item)}
+                      aria-label={`Muokkaa julkaisua: ${item.title}`}
+                    >
                       <Edit3 className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-amber-600" onClick={() => handleArchive(item.id)}>
-                      <Archive className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-600" onClick={() => setDeleteConfirmId(item.id)}>
+                    {item.is_archived ? (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-slate-400 hover:text-green-600" 
+                        onClick={() => handleRestore(item.id)}
+                        aria-label={`Palauta arkistosta: ${item.title}`}
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-slate-400 hover:text-amber-600" 
+                        onClick={() => handleArchive(item.id)}
+                        aria-label={`Arkistoi julkaisu: ${item.title}`}
+                      >
+                        <Archive className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-slate-400 hover:text-red-600" 
+                      onClick={() => setDeleteConfirmId(item.id)}
+                      aria-label={`Poista julkaisu pysyvästi: ${item.title}`}
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>

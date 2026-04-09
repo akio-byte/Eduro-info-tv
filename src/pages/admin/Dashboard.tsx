@@ -4,8 +4,10 @@ import { Megaphone, Calendar, ImageIcon, QrCode, FileText } from 'lucide-react';
 import { db, isMockFirebase } from '../../lib/firebase';
 import { collection, query, where, getCountFromServer } from 'firebase/firestore';
 import { useAuth } from '../../contexts/AuthContext';
+import { Skeleton } from '../../components/ui/Skeleton';
 
 export function Dashboard() {
+  const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     announcements: 0,
     events: 0,
@@ -20,6 +22,7 @@ export function Dashboard() {
     if (!orgId) return;
 
     async function fetchStats() {
+      setLoading(true);
       if (isMockFirebase) {
         setStats({
           announcements: 1,
@@ -28,6 +31,7 @@ export function Dashboard() {
           qrLinks: 0,
           total: 2
         });
+        setLoading(false);
         return;
       }
 
@@ -55,6 +59,8 @@ export function Dashboard() {
         });
       } catch (error) {
         console.error('Error fetching stats:', error);
+      } finally {
+        setLoading(false);
       }
     }
 
@@ -97,24 +103,42 @@ export function Dashboard() {
         </div>
         <div className="bg-white px-6 py-3 rounded-2xl border border-slate-200 shadow-sm">
           <div className="text-sm font-medium text-slate-500">Julkaisuja yhteensä</div>
-          <div className="text-2xl font-bold text-indigo-600">{stats.total}</div>
+          {loading ? (
+            <Skeleton variant="text" className="h-8 w-12 mt-1" />
+          ) : (
+            <div className="text-2xl font-bold text-indigo-600">{stats.total}</div>
+          )}
         </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {statCards.map((stat) => (
-          <Card key={stat.title} className="hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-slate-500">
-                {stat.title}
-              </CardTitle>
-              <stat.icon className={`h-5 w-5 ${stat.color}`} />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-slate-900">{stat.value}</div>
-            </CardContent>
-          </Card>
-        ))}
+        {loading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <Skeleton variant="text" className="h-4 w-24" />
+                <Skeleton variant="circular" className="h-5 w-5" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton variant="text" className="h-8 w-12" />
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          statCards.map((stat) => (
+            <Card key={stat.title} className="hover:shadow-md transition-shadow">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-slate-500">
+                  {stat.title}
+                </CardTitle>
+                <stat.icon className={`h-5 w-5 ${stat.color}`} aria-hidden="true" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-slate-900">{stat.value}</div>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
 
       <Card className="bg-indigo-600 text-white overflow-hidden relative">

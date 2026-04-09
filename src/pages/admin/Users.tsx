@@ -3,7 +3,7 @@ import { db, isMockFirebase } from '../../lib/firebase';
 import { collection, onSnapshot, query, orderBy, updateDoc, deleteDoc, doc, serverTimestamp, addDoc, Timestamp, where } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-utils';
 import { Button } from '../../components/ui/Button';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
 import { Label } from '../../components/ui/Label';
 import { Switch } from '../../components/ui/Switch';
 import { Input } from '../../components/ui/Input';
@@ -11,7 +11,9 @@ import { Trash2, User as UserIcon, Shield, ShieldAlert, Mail, UserPlus, Clock } 
 import { format, addDays } from 'date-fns';
 import { fi } from 'date-fns/locale';
 import { useAuth } from '../../contexts/AuthContext';
+import { Skeleton } from '../../components/ui/Skeleton';
 import type { UserProfile, Invitation, UserRole } from '../../types/firestore';
+import { AlertTriangle, X } from 'lucide-react';
 
 export function Users() {
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -20,6 +22,12 @@ export function Users() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<UserRole>('editor');
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{
+    type: 'role' | 'delete_user' | 'delete_invite';
+    id: string;
+    extra?: any;
+  } | null>(null);
+  
   const { user: currentUser, role: currentRole, orgId } = useAuth();
 
   useEffect(() => {
@@ -127,6 +135,7 @@ export function Users() {
     
     if (isMockFirebase) {
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+      setConfirmAction(null);
       return;
     }
 
@@ -139,6 +148,8 @@ export function Users() {
     } catch (error) {
       setMessage({ type: 'error', text: 'Roolin päivitys epäonnistui.' });
       handleFirestoreError(error, OperationType.UPDATE, `users/${userId}`);
+    } finally {
+      setConfirmAction(null);
     }
   }
 
@@ -148,10 +159,9 @@ export function Users() {
       return;
     }
 
-    if (!confirm('Haluatko varmasti poistaa tämän käyttäjän?')) return;
-
     if (isMockFirebase) {
       setUsers(prev => prev.filter(u => u.id !== userId));
+      setConfirmAction(null);
       return;
     }
 
@@ -161,14 +171,15 @@ export function Users() {
     } catch (error) {
       setMessage({ type: 'error', text: 'Poisto epäonnistui.' });
       handleFirestoreError(error, OperationType.DELETE, `users/${userId}`);
+    } finally {
+      setConfirmAction(null);
     }
   }
 
   async function handleDeleteInvite(inviteId: string) {
-    if (!confirm('Haluatko varmasti perua tämän kutsun?')) return;
-
     if (isMockFirebase) {
       setInvitations(prev => prev.filter(i => i.id !== inviteId));
+      setConfirmAction(null);
       return;
     }
 
@@ -178,6 +189,8 @@ export function Users() {
     } catch (error) {
       setMessage({ type: 'error', text: 'Kutsun peruminen epäonnistui.' });
       handleFirestoreError(error, OperationType.DELETE, `invitations/${inviteId}`);
+    } finally {
+      setConfirmAction(null);
     }
   }
 
@@ -200,7 +213,11 @@ export function Users() {
       </div>
 
       {message && (
-        <div className={`p-4 rounded-md ${message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+        <div 
+          role="alert" 
+          aria-live="polite"
+          className={`p-4 rounded-md ${message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}
+        >
           {message.text}
         </div>
       )}
@@ -268,7 +285,23 @@ export function Users() {
             </h2>
             <div className="grid gap-4">
               {loading ? (
-                <div className="text-slate-500">Ladataan...</div>
+                Array.from({ length: 3 }).map((_, i) => (
+                  <Card key={i}>
+                    <CardContent className="flex items-center justify-between p-4">
+                      <div className="flex items-center space-x-3">
+                        <Skeleton variant="circular" className="h-10 w-10" />
+                        <div className="space-y-2">
+                          <Skeleton variant="text" className="h-4 w-32" />
+                          <Skeleton variant="text" className="h-3 w-20" />
+                        </div>
+                      </div>
+                      <div className="flex gap-4">
+                        <Skeleton variant="text" className="h-8 w-16" />
+                        <Skeleton variant="circular" className="h-8 w-8" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
               ) : users.length === 0 ? (
                 <Card><CardContent className="py-8 text-center text-slate-500">Ei käyttäjiä.</CardContent></Card>
               ) : (
@@ -298,7 +331,7 @@ export function Users() {
                           <Switch
                             id={`role-${user.id}`}
                             checked={user.role === 'admin'}
-                            onCheckedChange={() => toggleRole(user.id, user.role)}
+                            onCheckedChange={() => setConfirmAction({ type: 'role', id: user.id, extra: user.role })}
                             disabled={user.id === currentUser?.uid}
                             className="scale-75"
                           />
@@ -307,8 +340,9 @@ export function Users() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-slate-400 hover:text-red-600"
-                          onClick={() => handleDeleteUser(user.id)}
+                          onClick={() => setConfirmAction({ type: 'delete_user', id: user.id })}
                           disabled={user.id === currentUser?.uid}
+                          aria-label={`Poista käyttäjä: ${user.email}`}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -336,17 +370,27 @@ export function Users() {
                         </div>
                         <div>
                           <h3 className="font-medium text-slate-900">{invite.email}</h3>
-                          <p className="text-xs text-slate-500">
-                            Kutsuttu: {format(new Date(invite.created_at), 'd.M.yyyy', { locale: fi })} • 
-                            Rooli: {invite.role === 'admin' ? 'Ylläpitäjä' : 'Toimittaja'}
-                          </p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                              invite.status === 'pending' ? 'bg-amber-50 text-amber-600' : 
+                              invite.status === 'accepted' ? 'bg-green-50 text-green-600' : 
+                              'bg-slate-50 text-slate-400'
+                            }`}>
+                              {invite.status === 'pending' ? 'Odottaa' : invite.status === 'accepted' ? 'Hyväksytty' : 'Vanhentunut'}
+                            </span>
+                            <p className="text-xs text-slate-500">
+                              Kutsuttu: {format(new Date(invite.created_at), 'd.M.yyyy', { locale: fi })} • 
+                              Rooli: {invite.role === 'admin' ? 'Ylläpitäjä' : 'Toimittaja'}
+                            </p>
+                          </div>
                         </div>
                       </div>
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-slate-400 hover:text-red-600"
-                        onClick={() => handleDeleteInvite(invite.id)}
+                        onClick={() => setConfirmAction({ type: 'delete_invite', id: invite.id })}
+                        aria-label={`Peru kutsu: ${invite.email}`}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -358,6 +402,44 @@ export function Users() {
           )}
         </div>
       </div>
+      {/* Confirmation Dialog Overlay */}
+      {confirmAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-sm">
+          <Card className="w-full max-w-md shadow-2xl border-slate-100">
+            <CardHeader className="space-y-1">
+              <div className="flex items-center gap-2 text-amber-600 mb-2">
+                <AlertTriangle className="h-5 w-5" />
+                <CardTitle className="text-lg">
+                  {confirmAction.type === 'role' ? 'Vahvista roolin muutos' : 
+                   confirmAction.type === 'delete_user' ? 'Vahvista käyttäjän poisto' : 
+                   'Vahvista kutsun peruminen'}
+                </CardTitle>
+              </div>
+              <CardDescription>
+                {confirmAction.type === 'role' ? 'Haluatko varmasti muuttaa käyttäjän roolia?' : 
+                 confirmAction.type === 'delete_user' ? 'Haluatko varmasti poistaa tämän käyttäjän organisaatiosta? Tätä toimintoa ei voi peruuttaa.' : 
+                 'Haluatko varmasti perua tämän kutsun?'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex justify-end gap-3 pt-4">
+              <Button variant="outline" onClick={() => setConfirmAction(null)}>
+                Peruuta
+              </Button>
+              <Button 
+                variant={confirmAction.type === 'role' ? 'default' : 'destructive'}
+                className={confirmAction.type === 'role' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-red-600 hover:bg-red-700'}
+                onClick={() => {
+                  if (confirmAction.type === 'role') toggleRole(confirmAction.id, confirmAction.extra);
+                  else if (confirmAction.type === 'delete_user') handleDeleteUser(confirmAction.id);
+                  else if (confirmAction.type === 'delete_invite') handleDeleteInvite(confirmAction.id);
+                }}
+              >
+                Vahvista
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

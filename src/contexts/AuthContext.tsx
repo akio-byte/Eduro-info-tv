@@ -69,10 +69,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             defaultOrgId = inviteData.org_id;
             invitationId = inviteDoc.id;
           } else {
-            // Check for initial admin email from environment or hardcoded fallback
-            const initialAdminEmail = import.meta.env.VITE_INITIAL_ADMIN_EMAIL || 'aki.oksala@gmail.com';
+            // Check for initial admin email from environment
+            const initialAdminEmail = import.meta.env.VITE_INITIAL_ADMIN_EMAIL;
             
-            if (firebaseUser.email === initialAdminEmail) {
+            if (initialAdminEmail && firebaseUser.email === initialAdminEmail) {
               defaultRole = 'admin';
             } else {
               // Check if this is the first user in the system (bootstrap)

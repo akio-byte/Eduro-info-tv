@@ -11,6 +11,7 @@ import { Textarea } from '../../components/ui/Textarea';
 import { Switch } from '../../components/ui/Switch';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
 import { useAuth } from '../../contexts/AuthContext';
+import { Skeleton } from '../../components/ui/Skeleton';
 
 type Settings = DisplaySettings;
 
@@ -54,7 +55,7 @@ export function Settings() {
           theme: d.theme || 'dark',
           created_at: d.created_at instanceof Timestamp ? d.created_at.toDate().toISOString() : d.created_at,
           updated_at: d.updated_at instanceof Timestamp ? d.updated_at.toDate().toISOString() : d.updated_at,
-        } as any as Settings);
+        } as unknown as Settings);
       } else {
         // If no settings exist, provide default settings so the user can save them
         setSettings({
@@ -73,7 +74,7 @@ export function Settings() {
           theme: 'dark',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        } as any as Settings);
+        } as unknown as Settings);
       }
       setLoading(false);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'display_settings/default'));
@@ -105,11 +106,11 @@ export function Settings() {
     }
 
     try {
-      const { id, created_at, updated_at, ...rest } = settings as any;
-      const payload = {
+      const { id, created_at, updated_at, ...rest } = settings;
+      const payload: Partial<Settings> = {
         ...rest,
         theme: rest.theme || 'dark',
-        updated_at: serverTimestamp(),
+        updated_at: serverTimestamp() as any,
       };
 
       if (id && id !== 'default') {
@@ -143,7 +144,23 @@ export function Settings() {
   }
 
   if (loading) {
-    return <div className="text-slate-500">Ladataan asetuksia...</div>;
+    return (
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <Skeleton variant="text" className="h-10 w-48" />
+          <Skeleton variant="text" className="h-4 w-64" />
+        </div>
+        <Card>
+          <CardHeader>
+            <Skeleton variant="text" className="h-6 w-32" />
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <Skeleton variant="rectangular" className="h-32 w-full" />
+            <Skeleton variant="rectangular" className="h-12 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   if (!settings) {
@@ -158,7 +175,11 @@ export function Settings() {
       </div>
 
       {message && (
-        <div className={`p-4 rounded-md ${message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+        <div 
+          role="alert" 
+          aria-live="polite"
+          className={`p-4 rounded-md ${message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}
+        >
           {message.text}
         </div>
       )}
