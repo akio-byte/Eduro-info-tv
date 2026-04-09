@@ -103,7 +103,7 @@ export function Users() {
       };
       setInvitations([newInvite, ...invitations]);
       setInviteEmail('');
-      setMessage({ type: 'success', text: `Kutsu lähetetty osoitteeseen ${inviteEmail}` });
+      setMessage({ type: 'success', text: `Kutsu lähetetty osoitteeseen ${inviteEmail}. (Mock-tila: sähköpostia ei oikeasti lähetetä)` });
       return;
     }
 
@@ -118,7 +118,7 @@ export function Users() {
         expires_at: Timestamp.fromDate(addDays(new Date(), 7))
       });
       setInviteEmail('');
-      setMessage({ type: 'success', text: `Kutsu lähetetty osoitteeseen ${inviteEmail}` });
+      setMessage({ type: 'success', text: `Kutsu lähetetty osoitteeseen ${inviteEmail}. Käyttäjä saa sähköpostin salasanan asettamiseksi.` });
     } catch (error) {
       setMessage({ type: 'error', text: 'Kutsun lähettäminen epäonnistui.' });
       handleFirestoreError(error, OperationType.CREATE, 'invitations');

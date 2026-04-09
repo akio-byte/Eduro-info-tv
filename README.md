@@ -63,6 +63,16 @@ The application is a standard Vite SPA (Single Page Application) and can be depl
      firebase deploy --only firestore:rules,storage
      ```
    - Alternatively, you can copy the contents of `firestore.rules` and `storage.rules` directly into the Rules tab of the Firestore and Storage sections in the Firebase Console.
+3. **Deploying Cloud Functions**:
+   - The application uses Cloud Functions to handle automated invitations and email sending.
+   - To deploy the functions, run:
+     ```bash
+     firebase deploy --only functions
+     ```
+   - **Note**: You must set up SMTP environment variables in the Firebase Console or via CLI for the email sending to work:
+     ```bash
+     firebase functions:config:set smtp.host="smtp.yourserver.com" smtp.port="587" smtp.user="your-email@example.com" smtp.pass="your-password"
+     ```
 
 ## V2 Roadmap Ideas
 
