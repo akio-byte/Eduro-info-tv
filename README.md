@@ -21,7 +21,7 @@ A digital signage / InfoTV system built with React, TypeScript, Tailwind CSS, an
 
 ### 1. Firebase Setup
 1. Go to [console.firebase.google.com](https://console.firebase.google.com) and create a new project.
-2. Enable **Authentication** and add **Google** as a sign-in provider.
+2. Enable **Authentication** and add **Google** and **Email/Password** as sign-in providers.
 3. Enable **Cloud Firestore** and create a database.
 4. Deploy the security rules from `firestore.rules`.
 5. (Optional) Enable **Firebase Storage** if you plan to use image uploads.

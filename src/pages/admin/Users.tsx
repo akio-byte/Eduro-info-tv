@@ -28,7 +28,7 @@ export function Users() {
     extra?: any;
   } | null>(null);
   
-  const { user: currentUser, role: currentRole, orgId } = useAuth();
+  const { user: currentUser, role: currentRole, orgId, resetPassword } = useAuth();
 
   useEffect(() => {
     if (currentRole !== 'admin' || !orgId) {
@@ -194,6 +194,16 @@ export function Users() {
     }
   }
 
+  async function handleSendReset(email: string) {
+    try {
+      await resetPassword(email);
+      setMessage({ type: 'success', text: `Salasanan palautuslinkki lähetetty osoitteeseen ${email}` });
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Linkin lähettäminen epäonnistui.' });
+      handleFirestoreError(error, OperationType.UPDATE, 'auth/reset');
+    }
+  }
+
   if (currentRole !== 'admin') {
     return (
       <div className="flex h-full items-center justify-center">
@@ -326,6 +336,15 @@ export function Users() {
                       </div>
 
                       <div className="flex items-center space-x-4">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-400 hover:text-indigo-600"
+                          onClick={() => handleSendReset(user.email)}
+                          aria-label={`Lähetä salasanan palautuslinkki: ${user.email}`}
+                        >
+                          <Mail className="h-4 w-4" />
+                        </Button>
                         <div className="flex items-center space-x-2">
                           <Label htmlFor={`role-${user.id}`} className="text-xs">Ylläpitäjä</Label>
                           <Switch

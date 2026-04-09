@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { auth, db, isMockFirebase } from '../lib/firebase';
-import { onAuthStateChanged, signOut as firebaseSignOut, User } from 'firebase/auth';
+import { onAuthStateChanged, signOut as firebaseSignOut, User, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, limit, getDocs, updateDoc } from 'firebase/firestore';
 import type { UserRole } from '../types/firestore';
 
@@ -10,6 +10,9 @@ interface AuthContextType {
   orgId: string | null;
   isLoading: boolean;
   signOut: () => Promise<void>;
+  signInWithEmail: (email: string, pass: string) => Promise<void>;
+  signUpWithEmail: (email: string, pass: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -18,6 +21,9 @@ const AuthContext = createContext<AuthContextType>({
   orgId: null,
   isLoading: true,
   signOut: async () => {},
+  signInWithEmail: async () => {},
+  signUpWithEmail: async () => {},
+  resetPassword: async () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -151,8 +157,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setOrgId(null);
   };
 
+  const signInWithEmail = async (email: string, pass: string) => {
+    if (isMockFirebase) {
+      setUser({ uid: 'mock-user', email, displayName: 'Mock User' } as any);
+      setRole('editor');
+      setOrgId('default-org');
+      return;
+    }
+    await signInWithEmailAndPassword(auth, email, pass);
+  };
+
+  const signUpWithEmail = async (email: string, pass: string) => {
+    if (isMockFirebase) {
+      setUser({ uid: 'mock-user-' + Math.random(), email, displayName: 'Mock User' } as any);
+      setRole('editor');
+      setOrgId('default-org');
+      return;
+    }
+    await createUserWithEmailAndPassword(auth, email, pass);
+  };
+
+  const resetPassword = async (email: string) => {
+    if (isMockFirebase) return;
+    await sendPasswordResetEmail(auth, email);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, role, orgId, isLoading, signOut }}>
+    <AuthContext.Provider value={{ user, role, orgId, isLoading, signOut, signInWithEmail, signUpWithEmail, resetPassword }}>
       {children}
     </AuthContext.Provider>
   );
