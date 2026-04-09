@@ -22,7 +22,7 @@ export interface Invitation {
   expires_at: Timestamp | string;
 }
 
-export type ContentType = 'announcement' | 'event' | 'media' | 'qr' | 'mixed';
+export type ContentType = 'announcement' | 'event' | 'media' | 'qr' | 'mixed' | 'rss';
 
 export interface ContentItem {
   id: string;
@@ -31,6 +31,7 @@ export interface ContentItem {
   title: string;
   body: string | null;
   media_url: string | null;
+  rss_url?: string | null;
   media_type: 'none' | 'image' | 'video';
   event_date: string | null;
   start_time: string | null;

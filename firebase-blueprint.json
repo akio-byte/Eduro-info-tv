@@ -34,10 +34,11 @@
       "type": "object",
       "properties": {
         "org_id": { "type": "string" },
-        "type": { "type": "string", "enum": ["announcement", "event", "media", "qr", "mixed"] },
+        "type": { "type": "string", "enum": ["announcement", "event", "media", "qr", "mixed", "rss"] },
         "title": { "type": "string" },
         "body": { "type": ["string", "null"] },
         "media_url": { "type": ["string", "null"], "format": "uri" },
+        "rss_url": { "type": ["string", "null"], "format": "uri" },
         "media_type": { "type": "string", "enum": ["none", "image", "video"] },
         "event_date": { "type": ["string", "null"], "format": "date" },
         "start_time": { "type": ["string", "null"] },

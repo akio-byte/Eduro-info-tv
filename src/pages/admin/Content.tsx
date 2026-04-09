@@ -43,7 +43,8 @@ import {
   Upload,
   Loader2,
   AlertTriangle,
-  X
+  X,
+  Rss
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fi } from 'date-fns/locale';
@@ -354,6 +355,7 @@ export function Content() {
                       { id: 'media', label: 'Media', icon: ImageIcon },
                       { id: 'qr', label: 'QR-linkki', icon: QrCode },
                       { id: 'mixed', label: 'Yhdistelmä', icon: Filter },
+                      { id: 'rss', label: 'RSS-syöte', icon: Rss },
                     ].map((t) => (
                       <button
                         key={t.id}
@@ -578,6 +580,21 @@ export function Content() {
                     onChange={(e) => setCurrentItem({ ...currentItem, qr_url: e.target.value })}
                     placeholder="https://eduro.fi/lue-lisaa"
                   />
+                </div>
+              )}
+
+              {currentItem.type === 'rss' && (
+                <div className="space-y-2">
+                  <Label htmlFor="rss_url">RSS-syötteen URL</Label>
+                  <Input
+                    id="rss_url"
+                    value={currentItem.rss_url || ''}
+                    onChange={(e) => setCurrentItem({ ...currentItem, rss_url: e.target.value })}
+                    placeholder="https://yle.fi/rss/t/18-139752/fi"
+                  />
+                  <p className="text-xs text-slate-500">
+                    Syötteen sisältö haetaan automaattisesti ja näytetään InfoTV:ssä.
+                  </p>
                 </div>
               )}
             </CardContent>

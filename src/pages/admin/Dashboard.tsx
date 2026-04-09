@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
-import { Megaphone, Calendar, ImageIcon, QrCode, FileText } from 'lucide-react';
+import { Megaphone, Calendar, ImageIcon, QrCode, FileText, Rss } from 'lucide-react';
 import { db, isMockFirebase } from '../../lib/firebase';
 import { collection, query, where, getCountFromServer } from 'firebase/firestore';
 import { useAuth } from '../../contexts/AuthContext';
@@ -13,6 +13,7 @@ export function Dashboard() {
     events: 0,
     media: 0,
     qrLinks: 0,
+    rssFeeds: 0,
     total: 0
   });
   
@@ -29,7 +30,8 @@ export function Dashboard() {
           events: 0,
           media: 1,
           qrLinks: 0,
-          total: 2
+          rssFeeds: 1,
+          total: 3
         });
         setLoading(false);
         return;
@@ -42,11 +44,12 @@ export function Dashboard() {
           where('is_archived', '==', false)
         );
 
-        const [annSnap, evSnap, mediaSnap, qrSnap, totalSnap] = await Promise.all([
+        const [annSnap, evSnap, mediaSnap, qrSnap, rssSnap, totalSnap] = await Promise.all([
           getCountFromServer(query(baseQuery, where('type', '==', 'announcement'), where('is_published', '==', true))),
           getCountFromServer(query(baseQuery, where('type', '==', 'event'), where('is_published', '==', true))),
           getCountFromServer(query(baseQuery, where('type', '==', 'media'), where('is_published', '==', true))),
           getCountFromServer(query(baseQuery, where('type', '==', 'qr'), where('is_published', '==', true))),
+          getCountFromServer(query(baseQuery, where('type', '==', 'rss'), where('is_published', '==', true))),
           getCountFromServer(baseQuery)
         ]);
 
@@ -55,6 +58,7 @@ export function Dashboard() {
           events: evSnap.data().count,
           media: mediaSnap.data().count,
           qrLinks: qrSnap.data().count,
+          rssFeeds: rssSnap.data().count,
           total: totalSnap.data().count
         });
       } catch (error) {
@@ -91,6 +95,12 @@ export function Dashboard() {
       value: stats.qrLinks,
       icon: QrCode,
       color: 'text-indigo-500',
+    },
+    {
+      title: 'RSS-syötteet',
+      value: stats.rssFeeds,
+      icon: Rss,
+      color: 'text-orange-600',
     },
   ];
 

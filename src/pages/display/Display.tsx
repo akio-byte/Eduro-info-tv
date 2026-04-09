@@ -8,7 +8,8 @@ import { format, parseISO } from 'date-fns';
 import { fi } from 'date-fns/locale';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Clock, Calendar, MapPin, Info, Megaphone, QrCode } from 'lucide-react';
+import { Clock, Calendar, MapPin, Info, Megaphone, QrCode, Rss } from 'lucide-react';
+import { RssFeed } from '../../components/display/RssFeed';
 
 export function Display() {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -273,30 +274,38 @@ export function Display() {
                 )}
 
                 {/* Text Side */}
-                {currentContent.body && (
+                {(currentContent.body || currentContent.type === 'rss') && (
                   <div className={`flex flex-col justify-center p-20 ${currentContent.media_url ? 'w-1/2' : 'w-full max-w-6xl mx-auto'}`}>
                     <div className="flex items-center gap-4 mb-10">
                       <div className={`p-3 rounded-xl ${isLight ? 'bg-slate-100 text-slate-400' : 'bg-slate-800/50 text-slate-400'}`}>
                         {currentContent.type === 'announcement' ? <Megaphone className="h-8 w-8" /> :
                          currentContent.type === 'event' ? <Calendar className="h-8 w-8" /> :
                          currentContent.type === 'qr' ? <QrCode className="h-8 w-8" /> :
+                         currentContent.type === 'rss' ? <Rss className="h-8 w-8" /> :
                          <Info className="h-8 w-8" />}
                       </div>
                       <span className={`text-2xl font-bold tracking-widest uppercase ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
                         {currentContent.type === 'announcement' ? 'Tiedote' :
                          currentContent.type === 'event' ? 'Tapahtuma' :
                          currentContent.type === 'qr' ? 'Pikalinkki' :
+                         currentContent.type === 'rss' ? 'Uutiset' :
                          'Julkaisu'}
                       </span>
                     </div>
 
-                    <h2 className={`text-7xl font-bold leading-[1.1] mb-12 ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                      {currentContent.title}
-                    </h2>
+                    {currentContent.type === 'rss' && currentContent.rss_url ? (
+                      <RssFeed url={currentContent.rss_url} isLight={isLight} />
+                    ) : (
+                      <>
+                        <h2 className={`text-7xl font-bold leading-[1.1] mb-12 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                          {currentContent.title}
+                        </h2>
 
-                    <div className={`text-3xl leading-relaxed whitespace-pre-wrap font-medium ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
-                      {currentContent.body}
-                    </div>
+                        <div className={`text-3xl leading-relaxed whitespace-pre-wrap font-medium ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+                          {currentContent.body}
+                        </div>
+                      </>
+                    )}
 
                     {currentContent.type === 'event' && currentContent.event_date && (
                       <div className="mt-16 grid grid-cols-2 gap-8">

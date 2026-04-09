@@ -1,17 +1,55 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onInvitationCreated = exports.generateAiContent = void 0;
+exports.onInvitationCreated = exports.fetchRssFeed = exports.generateAiContent = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-functions/v2/firestore");
 const app_1 = require("firebase-admin/app");
 const firestore_2 = require("firebase-admin/firestore");
 const auth_1 = require("firebase-admin/auth");
 const genai_1 = require("@google/genai");
-const nodemailer = require("nodemailer");
+const nodemailer = __importStar(require("nodemailer"));
+const rss_parser_1 = __importDefault(require("rss-parser"));
 // Initialize Firebase Admin
 (0, app_1.initializeApp)();
 const db = (0, firestore_2.getFirestore)();
 const auth = (0, auth_1.getAuth)();
+const parser = new rss_parser_1.default();
 // Initialize Gemini SDK
 const ai = new genai_1.GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 // Email transporter configuration
@@ -112,6 +150,34 @@ exports.generateAiContent = (0, https_1.onCall)(async (request) => {
     catch (error) {
         console.error('Gemini API Error:', error);
         throw new https_1.HttpsError('unknown', `Virhe tekoälysisällön generoinnissa: ${(error === null || error === void 0 ? void 0 : error.message) || 'Tuntematon virhe'}`);
+    }
+});
+/**
+ * Fetches and parses an RSS feed.
+ */
+exports.fetchRssFeed = (0, https_1.onCall)(async (request) => {
+    const url = request.data.url;
+    if (!url || typeof url !== 'string') {
+        throw new https_1.HttpsError('invalid-argument', 'URL puuttuu tai on virheellinen.');
+    }
+    try {
+        const feed = await parser.parseURL(url);
+        return {
+            title: feed.title,
+            description: feed.description,
+            items: feed.items.map((item) => ({
+                title: item.title,
+                link: item.link,
+                pubDate: item.pubDate,
+                contentSnippet: item.contentSnippet,
+                content: item.content,
+                creator: item.creator
+            })).slice(0, 10) // Limit to 10 items
+        };
+    }
+    catch (error) {
+        console.error('RSS Fetch Error:', error);
+        throw new https_1.HttpsError('unknown', `Virhe RSS-syötteen hakemisessa: ${(error === null || error === void 0 ? void 0 : error.message) || 'Tuntematon virhe'}`);
     }
 });
 /**

@@ -5,11 +5,13 @@ import { getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { GoogleGenAI, Type } from "@google/genai";
 import * as nodemailer from "nodemailer";
+import Parser from "rss-parser";
 
 // Initialize Firebase Admin
 initializeApp();
 const db = getFirestore();
 const auth = getAuth();
+const parser = new Parser();
 
 // Initialize Gemini SDK
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
@@ -143,6 +145,35 @@ export const generateAiContent = onCall<AiRequest>(async (request) => {
   } catch (error: any) {
     console.error('Gemini API Error:', error);
     throw new HttpsError('unknown', `Virhe tekoälysisällön generoinnissa: ${error?.message || 'Tuntematon virhe'}`);
+  }
+});
+
+/**
+ * Fetches and parses an RSS feed.
+ */
+export const fetchRssFeed = onCall(async (request) => {
+  const url = request.data.url;
+  if (!url || typeof url !== 'string') {
+    throw new HttpsError('invalid-argument', 'URL puuttuu tai on virheellinen.');
+  }
+
+  try {
+    const feed = await parser.parseURL(url);
+    return {
+      title: feed.title,
+      description: feed.description,
+      items: feed.items.map((item: any) => ({
+        title: item.title,
+        link: item.link,
+        pubDate: item.pubDate,
+        contentSnippet: item.contentSnippet,
+        content: item.content,
+        creator: item.creator
+      })).slice(0, 10) // Limit to 10 items
+    };
+  } catch (error: any) {
+    console.error('RSS Fetch Error:', error);
+    throw new HttpsError('unknown', `Virhe RSS-syötteen hakemisessa: ${error?.message || 'Tuntematon virhe'}`);
   }
 });
 
