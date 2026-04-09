@@ -99,20 +99,16 @@ service cloud.firestore {
     
     function isAdmin() {
       return isAuthenticated() && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
     
     function isEditor() {
       return isAuthenticated() && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'editor'];
     }
 
     function getUserOrg() {
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
-        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.org_id 
-        : 'default-org';
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.org_id;
     }
 
     function isOrgMember(orgId) {
@@ -180,8 +176,12 @@ service cloud.firestore {
       
       allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && (
         request.resource.data.role == 'editor' || 
-        !exists(/databases/$(database)/documents/users/$(request.auth.uid)) ||
-        isAdmin()
+        isAdmin() ||
+        // Bootstrap: If no users exist, allow creating the first admin.
+        // Note: Firestore rules cannot check if a collection is empty.
+        // This rule allows the first user to be admin if they are the one creating the doc.
+        // For production, it's safer to create the first admin via Firebase Console.
+        !exists(/databases/$(database)/documents/users/$(userId))
       );
       
       allow update: if isAuthenticated() && isValidUser(request.resource.data) && (

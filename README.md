@@ -53,6 +53,17 @@ The application is a standard Vite SPA (Single Page Application) and can be depl
 3. Ensure you add your Firebase configuration to your deployment environment variables.
 4. **Do not** set `VITE_ENABLE_MOCK_MODE=true` in production.
 
+### 5. Maintenance and Cleanup
+1. **Cleaning up old test data**:
+   - If you have old collections like `ilmoitukset`, `sisältökohteet`, or `näyttöasetukset` from previous versions, you can safely delete them manually in the Firebase Console.
+   - The current application uses `users`, `invitations`, `content_items`, and `display_settings`.
+2. **Deploying Security Rules**:
+   - To update the security rules in production, run the following command in your terminal:
+     ```bash
+     firebase deploy --only firestore:rules,storage
+     ```
+   - Alternatively, you can copy the contents of `firestore.rules` and `storage.rules` directly into the Rules tab of the Firestore and Storage sections in the Firebase Console.
+
 ## V2 Roadmap Ideas
 
 - Multiple display profiles (e.g., lobby vs. staff room)
