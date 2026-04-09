@@ -859,15 +859,17 @@ export function Content() {
                         <Archive className="h-4 w-4" />
                       </Button>
                     )}
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 text-slate-400 hover:text-red-600" 
-                      onClick={() => setDeleteConfirmId(item.id)}
-                      aria-label={`Poista julkaisu pysyvästi: ${item.title}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {item.is_archived && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-slate-400 hover:text-red-600" 
+                        onClick={() => setDeleteConfirmId(item.id)}
+                        aria-label={`Poista julkaisu pysyvästi: ${item.title}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               </Card>

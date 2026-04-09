@@ -106,6 +106,13 @@ export function Login() {
               {message.text}
             </div>
           )}
+
+          {mode === 'signup' && (
+            <div className="rounded-lg bg-indigo-50 p-3 text-sm text-indigo-700 border border-indigo-100">
+              <p className="font-medium mb-1">Onko sinut kutsuttu?</p>
+              <p>Käytä kutsussa annettua sähköpostiosoitetta. Rekisteröitymisen jälkeen sinut liitetään automaattisesti organisaatioon.</p>
+            </div>
+          )}
           
           <div className="flex p-1 bg-slate-100 rounded-lg mb-2">
             <button 
