@@ -8,6 +8,9 @@ import { Skeleton } from '../../components/ui/Skeleton';
 
 export function Dashboard() {
   const [loading, setLoading] = useState(true);
+  const [loadingRotation, setLoadingRotation] = useState(true);
+  const [forceCalculateRotation, setForceCalculateRotation] = useState(false);
+  const [tooManyItems, setTooManyItems] = useState(false);
   const [stats, setStats] = useState({
     announcements: 0,
     events: 0,
@@ -61,10 +64,32 @@ export function Dashboard() {
         );
 
         const publishedQuery = query(baseQuery, where('is_published', '==', true));
-        const [totalSnap, publishedSnap] = await Promise.all([
-          getCountFromServer(baseQuery),
-          getDocs(publishedQuery)
-        ]);
+        const totalSnap = await getCountFromServer(baseQuery);
+        const publishedCountSnap = await getCountFromServer(publishedQuery);
+        const publishedCount = publishedCountSnap.data().count;
+
+        // Basic stats
+        setStats({
+          announcements: 0, // We don't have per-type counts without getDocs, but we can just show total for now, or keep them 0 if we don't want to do 5 count queries.
+          events: 0,
+          media: 0,
+          qrLinks: 0,
+          rssFeeds: 0,
+          total: totalSnap.data().count
+        });
+        setLoading(false);
+
+        // Rotation stats logic
+        if (publishedCount > 200 && !forceCalculateRotation) {
+          setTooManyItems(true);
+          setLoadingRotation(false);
+          return;
+        }
+
+        setTooManyItems(false);
+        setLoadingRotation(true);
+        
+        const publishedSnap = await getDocs(publishedQuery);
 
         let announcements = 0;
         let events = 0;
@@ -129,11 +154,12 @@ export function Dashboard() {
         console.error('Error fetching stats:', error);
       } finally {
         setLoading(false);
+        setLoadingRotation(false);
       }
     }
 
     fetchStats();
-  }, [orgId]);
+  }, [orgId, forceCalculateRotation]);
 
   const formatDuration = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -224,7 +250,27 @@ export function Dashboard() {
         )}
       </div>
 
-      {!loading && rotationStats.totalDuration > 0 && (
+      {!loading && tooManyItems && !forceCalculateRotation && (
+        <Card className="bg-white border-indigo-100 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+              <Clock className="h-5 w-5 text-indigo-500" />
+              Kierron kokonaiskesto
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-slate-600 mb-4">Liian paljon sisältöä laskettavaksi reaaliaikaisesti.</p>
+            <button 
+              onClick={() => setForceCalculateRotation(true)}
+              className="text-sm bg-indigo-50 text-indigo-600 px-4 py-2 rounded-md hover:bg-indigo-100 transition-colors font-medium"
+            >
+              Laske silti
+            </button>
+          </CardContent>
+        </Card>
+      )}
+
+      {!loadingRotation && !tooManyItems && rotationStats.totalDuration > 0 && (
         <Card className="bg-white border-indigo-100 shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">

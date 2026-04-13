@@ -27,8 +27,10 @@ export function useWeather(lat: number, lon: number, enabled: boolean) {
           isDay: json.current.is_day === 1,
         });
         setError(null);
-      } catch (e: any) {
-        if (!cancelled) setError(e.message);
+      } catch (e: unknown) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : 'Unknown error fetching weather');
+        }
       }
     };
 

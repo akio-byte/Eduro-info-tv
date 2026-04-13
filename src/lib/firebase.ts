@@ -13,3 +13,7 @@ export const functions = getFunctions(app);
 export const googleProvider = new GoogleAuthProvider();
 
 export const isMockFirebase = import.meta.env.VITE_ENABLE_MOCK_MODE === 'true';
+
+if (isMockFirebase && import.meta.env.PROD) {
+  console.error('⚠️ WARNING: Mock mode is enabled in a production build! This should be disabled in production.');
+}

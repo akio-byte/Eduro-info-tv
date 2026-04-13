@@ -7,8 +7,10 @@ A digital signage / InfoTV system built with React, TypeScript, Tailwind CSS, an
 - **Public Display View (`/display`)**: A fullscreen, auto-rotating display optimized for large TV screens.
 - **Admin Dashboard (`/admin`)**: A secure area for staff to manage content.
 - **Role-Based Access**: Supports `admin` (full access including settings) and `editor` (content management only) roles.
-- **Content Types**: Announcements (with start/end dates), Events, Highlights (image cards), and QR Links.
-- **Customizable**: Change colors, rotation intervals, and toggle sections on/off.
+- **Content Types**: Announcements (with start/end dates), Events, Media (images/video), RSS Feeds, and QR Links.
+- **Customizable**: Change colors, rotation intervals, toggle sections on/off, and upload a custom logo.
+- **Weather Widget**: Built-in Open-Meteo integration for local weather display.
+- **AI Assistant**: Integrated Gemini AI for content generation and summarization.
 - **Live Preview**: Built-in preview route (`/admin/preview`) to see changes instantly.
 
 ## Architecture
@@ -53,7 +55,23 @@ The application is a standard Vite SPA (Single Page Application) and can be depl
 3. Ensure you add your Firebase configuration to your deployment environment variables.
 4. **Do not** set `VITE_ENABLE_MOCK_MODE=true` in production.
 
-### 5. Maintenance and Cleanup
+### 5. Deploying Cloud Functions & AI
+1. The application uses Cloud Functions to handle automated invitations, email sending, and **secure AI generation**.
+2. To deploy the functions, run:
+   ```bash
+   firebase deploy --only functions
+   ```
+3. **Set the Gemini API Key Secret**: The AI features require a Gemini API key. Set it as a secret in Firebase Functions:
+   ```bash
+   firebase functions:secrets:set GEMINI_API_KEY
+   ```
+   (Paste your key when prompted).
+4. **SMTP Setup (Optional)**: For email invitations to work:
+   ```bash
+   firebase functions:config:set smtp.host="smtp.yourserver.com" smtp.port="587" smtp.user="your-email@example.com" smtp.pass="your-password"
+   ```
+
+### 6. Maintenance and Cleanup
 1. **Cleaning up old test data**:
    - If you have old collections like `ilmoitukset`, `sisältökohteet`, or `näyttöasetukset` from previous versions, you can safely delete them manually in the Firebase Console.
    - The current application uses `users`, `invitations`, `content_items`, and `display_settings`.
@@ -63,22 +81,17 @@ The application is a standard Vite SPA (Single Page Application) and can be depl
      firebase deploy --only firestore:rules,storage
      ```
    - Alternatively, you can copy the contents of `firestore.rules` and `storage.rules` directly into the Rules tab of the Firestore and Storage sections in the Firebase Console.
-3. **Deploying Cloud Functions**:
-   - The application uses Cloud Functions to handle automated invitations and email sending.
-   - To deploy the functions, run:
-     ```bash
-     firebase deploy --only functions
-     ```
-   - **Note**: You must set up SMTP environment variables in the Firebase Console or via CLI for the email sending to work:
-     ```bash
-     firebase functions:config:set smtp.host="smtp.yourserver.com" smtp.port="587" smtp.user="your-email@example.com" smtp.pass="your-password"
-     ```
 
-## V2 Roadmap Ideas
+## Security Notes
+
+- **API Keys**: The `GEMINI_API_KEY` is securely stored in Firebase Functions secrets and is *never* exposed to the client browser.
+- **Firebase Config**: The `firebase-applet-config.json` file is gitignored to prevent accidental commits of local configuration.
+- **Key Rotation**: If this repository was previously public while containing an exposed API key in `vite.config.ts`, it is highly recommended to rotate your Gemini API key immediately.
+
+## V2.1 Roadmap Ideas
 
 - Multiple display profiles (e.g., lobby vs. staff room)
-- Direct image uploads to Supabase Storage for Highlights
 - Calendar sync (iCal/Google Calendar integration)
-- Remote scheduling (start/end dates) for all content types (currently only on Announcements)
 - Playlist mode for specific screen zones
-- Weather widget integration
+- Chromecast remote device management
+- Optimized dashboard performance for very large content catalogs (denormalized counters)

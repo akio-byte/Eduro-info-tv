@@ -8,12 +8,13 @@ import { format, parseISO } from 'date-fns';
 import { fi } from 'date-fns/locale';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Clock, Calendar, MapPin, Info, Megaphone, QrCode, Rss, Sun, Moon, Cloud, CloudSun, CloudMoon, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning } from 'lucide-react';
+import { Clock as ClockIcon, Calendar, MapPin, Info, Megaphone, QrCode, Rss, Sun, Moon, Cloud, CloudSun, CloudMoon, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning } from 'lucide-react';
 import { RssFeed } from '../../components/display/RssFeed';
 import { useWeather, weatherCodeToIcon } from '../../hooks/useWeather';
+import { Clock } from '../../components/display/Clock';
+import { DEFAULT_SLIDE_DURATION_SECONDS } from '../../lib/constants';
 
 export function Display() {
-  const [currentTime, setCurrentTime] = useState(new Date());
   const [settings, setSettings] = useState<Settings | null>(null);
   const [contentQueue, setContentQueue] = useState<ContentItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -53,7 +54,7 @@ export function Display() {
           qr_url: null,
           publish_start: null,
           publish_end: null,
-          duration_seconds: 15,
+          duration_seconds: DEFAULT_SLIDE_DURATION_SECONDS,
           is_published: true,
           is_archived: false,
           sort_order: 0,
@@ -153,7 +154,7 @@ export function Display() {
     if (contentQueue.length <= 1) return;
 
     const currentItem = contentQueue[currentIndex];
-    const duration = (currentItem?.duration_seconds || 15) * 1000;
+    const duration = (currentItem?.duration_seconds || DEFAULT_SLIDE_DURATION_SECONDS) * 1000;
     
     const rotationTimer = setTimeout(() => {
       setCurrentIndex((prev) => (prev + 1) % contentQueue.length);
@@ -223,14 +224,7 @@ export function Display() {
                 </div>
               );
             })()}
-            <div className="text-right">
-              <div className={`text-6xl font-bold tracking-tighter tabular-nums ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                {format(currentTime, 'HH:mm')}
-              </div>
-              <div className={`text-2xl mt-1 capitalize font-medium ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                {format(currentTime, 'EEEE, d. MMMM yyyy', { locale: fi })}
-              </div>
-            </div>
+            <Clock isLight={isLight} />
           </div>
         </header>
 
@@ -284,7 +278,7 @@ export function Display() {
                     ) : (
                       <img 
                         src={currentContent.media_url} 
-                        alt="" 
+                        alt={currentContent.title || 'Infonäytön kuva'} 
                         className="absolute inset-0 h-full w-full object-cover"
                         referrerPolicy="no-referrer"
                       />
@@ -343,7 +337,7 @@ export function Display() {
                         <div className={`flex items-center space-x-6 p-6 rounded-3xl border ${
                           isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/40 border-slate-800/50'
                         }`}>
-                          <Clock className="h-12 w-12" style={{ color: settings.accent_color || '#4f46e5' }} />
+                          <ClockIcon className="h-12 w-12" style={{ color: settings.accent_color || '#4f46e5' }} />
                           <div>
                             <div className={`text-xl mb-1 font-bold uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Aika</div>
                             <div className={`text-3xl font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>
@@ -405,7 +399,7 @@ export function Display() {
                 style={{ backgroundColor: settings.accent_color || '#4f46e5' }}
                 initial={{ width: '0%' }}
                 animate={{ width: '100%' }}
-                transition={{ duration: currentContent.duration_seconds || 15, ease: "linear" }}
+                transition={{ duration: currentContent.duration_seconds || DEFAULT_SLIDE_DURATION_SECONDS, ease: "linear" }}
               />
             )}
           </div>

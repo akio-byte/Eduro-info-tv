@@ -4,6 +4,7 @@ import { collection, onSnapshot, query, limit, updateDoc, doc, setDoc, getDocs, 
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-utils';
 import { mockSettings } from '../../lib/mock-data';
+import { DEFAULT_ROTATION_INTERVAL_SECONDS } from '../../lib/constants';
 import type { DisplaySettings } from '../../types/firestore';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -63,7 +64,7 @@ export function Settings() {
           id: 'default',
           org_name: 'Eduro',
           welcome_text: 'Tervetuloa InfoTV:hen',
-          rotation_interval_seconds: 15,
+          rotation_interval_seconds: DEFAULT_ROTATION_INTERVAL_SECONDS,
           show_announcements: true,
           show_events: true,
           show_highlights: true,
@@ -331,8 +332,8 @@ export function Settings() {
                   type="number"
                   min="5"
                   max="60"
-                  value={settings.rotation_interval_seconds || 15}
-                  onChange={(e) => setSettings({ ...settings, rotation_interval_seconds: parseInt(e.target.value) || 15 })}
+                  value={settings.rotation_interval_seconds || DEFAULT_ROTATION_INTERVAL_SECONDS}
+                  onChange={(e) => setSettings({ ...settings, rotation_interval_seconds: parseInt(e.target.value) || DEFAULT_ROTATION_INTERVAL_SECONDS })}
                   required
                 />
               </div>
