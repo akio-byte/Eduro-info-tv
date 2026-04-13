@@ -8,8 +8,9 @@ import { format, parseISO } from 'date-fns';
 import { fi } from 'date-fns/locale';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Clock, Calendar, MapPin, Info, Megaphone, QrCode, Rss } from 'lucide-react';
+import { Clock, Calendar, MapPin, Info, Megaphone, QrCode, Rss, Sun, Moon, Cloud, CloudSun, CloudMoon, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning } from 'lucide-react';
 import { RssFeed } from '../../components/display/RssFeed';
+import { useWeather, weatherCodeToIcon } from '../../hooks/useWeather';
 
 export function Display() {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -17,6 +18,12 @@ export function Display() {
   const [contentQueue, setContentQueue] = useState<ContentItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  const { data: weatherData } = useWeather(
+    settings?.weather_lat || 66.5039, 
+    settings?.weather_lon || 25.7294, 
+    !!settings?.show_weather
+  );
 
   // Update time every second
   useEffect(() => {
@@ -174,14 +181,18 @@ export function Display() {
       {/* Main Content Area */}
       <main className="flex-1 relative flex flex-col">
         {/* Header */}
-        <header className="flex items-center justify-between px-16 py-10 z-10">
+        <header className="flex items-center justify-between px-10 py-6 z-10">
           <div className="flex items-center space-x-6">
-            <div 
-              className="h-14 w-14 rounded-2xl flex items-center justify-center text-white font-bold text-3xl shadow-lg shadow-indigo-500/20"
-              style={{ backgroundColor: settings.accent_color || '#4f46e5' }}
-            >
-              {(settings.org_name || 'E').charAt(0)}
-            </div>
+            {settings.logo_url ? (
+              <img src={settings.logo_url} alt={settings.org_name} className="h-14 w-auto max-w-[240px] object-contain" referrerPolicy="no-referrer" />
+            ) : (
+              <div 
+                className="h-14 w-14 rounded-2xl flex items-center justify-center text-white font-bold text-3xl shadow-lg shadow-indigo-500/20"
+                style={{ backgroundColor: settings.accent_color || '#4f46e5' }}
+              >
+                {(settings.org_name || 'E').charAt(0)}
+              </div>
+            )}
             <div>
               <h1 className={`text-4xl font-bold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
                 {settings.org_name || 'Eduro'}
@@ -193,18 +204,38 @@ export function Display() {
               )}
             </div>
           </div>
-          <div className="text-right">
-            <div className={`text-6xl font-bold tracking-tighter tabular-nums ${isLight ? 'text-slate-900' : 'text-white'}`}>
-              {format(currentTime, 'HH:mm')}
-            </div>
-            <div className={`text-2xl mt-1 capitalize font-medium ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-              {format(currentTime, 'EEEE, d. MMMM yyyy', { locale: fi })}
+          <div className="flex items-center gap-8">
+            {settings.show_weather && weatherData && (() => {
+              const { icon } = weatherCodeToIcon(weatherData.weatherCode, weatherData.isDay);
+              const IconComponent = { Sun, Moon, Cloud, CloudSun, CloudMoon, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning }[icon as keyof typeof import('lucide-react')] || Cloud;
+              return (
+                <div className="flex items-center gap-4">
+                  <IconComponent className={`h-10 w-10 ${isLight ? 'text-slate-500' : 'text-slate-400'}`} />
+                  <div>
+                    <div className={`text-4xl font-bold tabular-nums ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                      {weatherData.temperature}°C
+                    </div>
+                    <div className={`text-lg font-medium ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                      {settings.weather_location_name || 'Sää'}
+                    </div>
+                  </div>
+                  <div className={`h-12 w-px ml-4 ${isLight ? 'bg-slate-200' : 'bg-slate-800'}`} />
+                </div>
+              );
+            })()}
+            <div className="text-right">
+              <div className={`text-6xl font-bold tracking-tighter tabular-nums ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                {format(currentTime, 'HH:mm')}
+              </div>
+              <div className={`text-2xl mt-1 capitalize font-medium ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                {format(currentTime, 'EEEE, d. MMMM yyyy', { locale: fi })}
+              </div>
             </div>
           </div>
         </header>
 
         {/* Content Rotation Area */}
-        <div className="flex-1 relative overflow-hidden px-16 pb-16">
+        <div className="flex-1 relative overflow-hidden px-10 pb-14">
           <AnimatePresence mode="wait">
             {!currentContent ? (
               <motion.div
@@ -260,7 +291,7 @@ export function Display() {
                     )}
                     {/* Media-only title overlay */}
                     {!currentContent.body && (
-                      <div className={`absolute bottom-0 left-0 right-0 p-20 z-20 ${
+                      <div className={`absolute bottom-0 left-0 right-0 p-10 z-20 ${
                         isLight 
                           ? 'bg-gradient-to-t from-white/90 to-transparent' 
                           : 'bg-gradient-to-t from-slate-950/90 to-transparent'
@@ -275,7 +306,7 @@ export function Display() {
 
                 {/* Text Side */}
                 {(currentContent.body || currentContent.type === 'rss') && (
-                  <div className={`flex flex-col justify-center p-20 ${currentContent.media_url ? 'w-1/2' : 'w-full max-w-6xl mx-auto'}`}>
+                  <div className={`flex flex-col justify-center p-12 ${currentContent.media_url ? 'w-1/2' : 'w-full max-w-6xl mx-auto'}`}>
                     <div className="flex items-center gap-4 mb-10">
                       <div className={`p-3 rounded-xl ${isLight ? 'bg-slate-100 text-slate-400' : 'bg-slate-800/50 text-slate-400'}`}>
                         {currentContent.type === 'announcement' ? <Megaphone className="h-8 w-8" /> :
@@ -297,7 +328,7 @@ export function Display() {
                       <RssFeed url={currentContent.rss_url} isLight={isLight} />
                     ) : (
                       <>
-                        <h2 className={`text-7xl font-bold leading-[1.1] mb-12 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                        <h2 className={`text-7xl font-bold leading-[1.1] mb-8 ${isLight ? 'text-slate-900' : 'text-white'}`}>
                           {currentContent.title}
                         </h2>
 
@@ -308,8 +339,8 @@ export function Display() {
                     )}
 
                     {currentContent.type === 'event' && currentContent.event_date && (
-                      <div className="mt-16 grid grid-cols-2 gap-8">
-                        <div className={`flex items-center space-x-6 p-8 rounded-3xl border ${
+                      <div className="mt-10 grid grid-cols-2 gap-8">
+                        <div className={`flex items-center space-x-6 p-6 rounded-3xl border ${
                           isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/40 border-slate-800/50'
                         }`}>
                           <Clock className="h-12 w-12" style={{ color: settings.accent_color || '#4f46e5' }} />
@@ -324,7 +355,7 @@ export function Display() {
                           </div>
                         </div>
                         {currentContent.location && (
-                          <div className={`flex items-center space-x-6 p-8 rounded-3xl border ${
+                          <div className={`flex items-center space-x-6 p-6 rounded-3xl border ${
                             isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/40 border-slate-800/50'
                           }`}>
                             <MapPin className="h-12 w-12" style={{ color: settings.accent_color || '#4f46e5' }} />
@@ -338,7 +369,7 @@ export function Display() {
                     )}
 
                     {currentContent.qr_url && (
-                      <div className={`mt-16 flex items-center gap-10 p-8 rounded-3xl border self-start ${
+                      <div className={`mt-10 flex items-center gap-10 p-6 rounded-3xl border self-start ${
                         isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/5 border-white/10'
                       }`}>
                         <div className="bg-white p-3 rounded-2xl shadow-sm">
@@ -355,12 +386,19 @@ export function Display() {
               </motion.div>
             )}
           </AnimatePresence>
-          
-          {/* Progress Bar */}
-          {contentQueue.length > 1 && currentContent && (
-            <div className={`absolute bottom-16 left-16 right-16 h-1.5 rounded-full overflow-hidden backdrop-blur-sm ${
-              isLight ? 'bg-slate-200/50' : 'bg-slate-900/50'
-            }`}>
+        </div>
+      </main>
+
+      {/* Bottom Strip */}
+      {contentQueue.length > 0 && currentContent && (
+        <div className="fixed bottom-0 left-0 right-0 z-20">
+          {contentQueue.length > 1 && (
+            <div className={`text-right px-6 pb-2 text-sm font-medium tracking-wider tabular-nums ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+              {currentIndex + 1} / {contentQueue.length}
+            </div>
+          )}
+          <div className={`h-1.5 w-full ${isLight ? 'bg-slate-200/60' : 'bg-slate-900/40'}`}>
+            {contentQueue.length > 1 && (
               <motion.div 
                 key={`progress-${currentContent.id}-${currentIndex}`}
                 className="h-full shadow-[0_0_10px_rgba(79,70,229,0.5)]"
@@ -369,10 +407,10 @@ export function Display() {
                 animate={{ width: '100%' }}
                 transition={{ duration: currentContent.duration_seconds || 15, ease: "linear" }}
               />
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </main>
+      )}
 
       {/* Sidebar - Optional, only if settings say so and we have QR links specifically for sidebar */}
       {/* For V1, we've moved QR links into the main content rotation for better visibility */}

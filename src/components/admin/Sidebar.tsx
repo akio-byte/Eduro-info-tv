@@ -59,13 +59,6 @@ export function Sidebar() {
 
       <div className="border-t border-slate-200 p-4 space-y-2">
         <Link
-          to="/admin/preview"
-          className="group flex w-full items-center rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900"
-        >
-          <Eye className="mr-3 h-5 w-5 text-slate-400 group-hover:text-slate-500" />
-          Esikatselu
-        </Link>
-        <Link
           to="/display"
           target="_blank"
           className="group flex w-full items-center rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900"

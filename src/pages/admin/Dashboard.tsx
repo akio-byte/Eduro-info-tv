@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
-import { Megaphone, Calendar, ImageIcon, QrCode, FileText, Rss } from 'lucide-react';
+import { Megaphone, Calendar, ImageIcon, QrCode, FileText, Rss, Clock } from 'lucide-react';
 import { db, isMockFirebase } from '../../lib/firebase';
-import { collection, query, where, getCountFromServer } from 'firebase/firestore';
+import { collection, query, where, getCountFromServer, getDocs } from 'firebase/firestore';
 import { useAuth } from '../../contexts/AuthContext';
 import { Skeleton } from '../../components/ui/Skeleton';
 
@@ -15,6 +15,14 @@ export function Dashboard() {
     qrLinks: 0,
     rssFeeds: 0,
     total: 0
+  });
+  const [rotationStats, setRotationStats] = useState({
+    totalDuration: 0,
+    announcementsDuration: 0,
+    eventsDuration: 0,
+    mediaDuration: 0,
+    qrDuration: 0,
+    rssDuration: 0,
   });
   
   const { orgId } = useAuth();
@@ -33,6 +41,14 @@ export function Dashboard() {
           rssFeeds: 1,
           total: 3
         });
+        setRotationStats({
+          totalDuration: 40,
+          announcementsDuration: 15,
+          eventsDuration: 0,
+          mediaDuration: 10,
+          qrDuration: 0,
+          rssDuration: 15,
+        });
         setLoading(false);
         return;
       }
@@ -44,22 +60,70 @@ export function Dashboard() {
           where('is_archived', '==', false)
         );
 
-        const [annSnap, evSnap, mediaSnap, qrSnap, rssSnap, totalSnap] = await Promise.all([
-          getCountFromServer(query(baseQuery, where('type', '==', 'announcement'), where('is_published', '==', true))),
-          getCountFromServer(query(baseQuery, where('type', '==', 'event'), where('is_published', '==', true))),
-          getCountFromServer(query(baseQuery, where('type', '==', 'media'), where('is_published', '==', true))),
-          getCountFromServer(query(baseQuery, where('type', '==', 'qr'), where('is_published', '==', true))),
-          getCountFromServer(query(baseQuery, where('type', '==', 'rss'), where('is_published', '==', true))),
-          getCountFromServer(baseQuery)
+        const publishedQuery = query(baseQuery, where('is_published', '==', true));
+        const [totalSnap, publishedSnap] = await Promise.all([
+          getCountFromServer(baseQuery),
+          getDocs(publishedQuery)
         ]);
 
+        let announcements = 0;
+        let events = 0;
+        let media = 0;
+        let qrLinks = 0;
+        let rssFeeds = 0;
+
+        let totalDuration = 0;
+        let announcementsDuration = 0;
+        let eventsDuration = 0;
+        let mediaDuration = 0;
+        let qrDuration = 0;
+        let rssDuration = 0;
+
+        publishedSnap.forEach(doc => {
+          const data = doc.data();
+          const duration = data.duration_seconds || 15;
+          totalDuration += duration;
+          
+          switch(data.type) {
+            case 'announcement':
+              announcements++;
+              announcementsDuration += duration;
+              break;
+            case 'event':
+              events++;
+              eventsDuration += duration;
+              break;
+            case 'media':
+              media++;
+              mediaDuration += duration;
+              break;
+            case 'qr':
+              qrLinks++;
+              qrDuration += duration;
+              break;
+            case 'rss':
+              rssFeeds++;
+              rssDuration += duration;
+              break;
+          }
+        });
+
         setStats({
-          announcements: annSnap.data().count,
-          events: evSnap.data().count,
-          media: mediaSnap.data().count,
-          qrLinks: qrSnap.data().count,
-          rssFeeds: rssSnap.data().count,
+          announcements,
+          events,
+          media,
+          qrLinks,
+          rssFeeds,
           total: totalSnap.data().count
+        });
+
+        setRotationStats({
+          totalDuration,
+          announcementsDuration,
+          eventsDuration,
+          mediaDuration,
+          qrDuration,
+          rssDuration,
         });
       } catch (error) {
         console.error('Error fetching stats:', error);
@@ -70,6 +134,15 @@ export function Dashboard() {
 
     fetchStats();
   }, [orgId]);
+
+  const formatDuration = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    if (m > 0) {
+      return `${m} min ${s > 0 ? `${s} s` : ''}`;
+    }
+    return `${s} s`;
+  };
 
   const statCards = [
     {
@@ -151,6 +224,73 @@ export function Dashboard() {
         )}
       </div>
 
+      {!loading && rotationStats.totalDuration > 0 && (
+        <Card className="bg-white border-indigo-100 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+              <Clock className="h-5 w-5 text-indigo-500" />
+              Kierron kokonaiskesto: {formatDuration(rotationStats.totalDuration)}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden flex mt-2">
+              {rotationStats.announcementsDuration > 0 && (
+                <div 
+                  style={{ width: `${(rotationStats.announcementsDuration / rotationStats.totalDuration) * 100}%` }} 
+                  className="bg-blue-500 h-full" 
+                  title={`Tiedotteet: ${formatDuration(rotationStats.announcementsDuration)}`}
+                />
+              )}
+              {rotationStats.eventsDuration > 0 && (
+                <div 
+                  style={{ width: `${(rotationStats.eventsDuration / rotationStats.totalDuration) * 100}%` }} 
+                  className="bg-orange-500 h-full" 
+                  title={`Tapahtumat: ${formatDuration(rotationStats.eventsDuration)}`}
+                />
+              )}
+              {rotationStats.mediaDuration > 0 && (
+                <div 
+                  style={{ width: `${(rotationStats.mediaDuration / rotationStats.totalDuration) * 100}%` }} 
+                  className="bg-purple-500 h-full" 
+                  title={`Media: ${formatDuration(rotationStats.mediaDuration)}`}
+                />
+              )}
+              {rotationStats.qrDuration > 0 && (
+                <div 
+                  style={{ width: `${(rotationStats.qrDuration / rotationStats.totalDuration) * 100}%` }} 
+                  className="bg-indigo-500 h-full" 
+                  title={`QR-linkit: ${formatDuration(rotationStats.qrDuration)}`}
+                />
+              )}
+              {rotationStats.rssDuration > 0 && (
+                <div 
+                  style={{ width: `${(rotationStats.rssDuration / rotationStats.totalDuration) * 100}%` }} 
+                  className="bg-orange-600 h-full" 
+                  title={`RSS: ${formatDuration(rotationStats.rssDuration)}`}
+                />
+              )}
+            </div>
+            <div className="flex flex-wrap gap-4 mt-4 text-sm text-slate-600">
+              {rotationStats.announcementsDuration > 0 && (
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-500" /> Tiedotteet ({formatDuration(rotationStats.announcementsDuration)})</div>
+              )}
+              {rotationStats.eventsDuration > 0 && (
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-orange-500" /> Tapahtumat ({formatDuration(rotationStats.eventsDuration)})</div>
+              )}
+              {rotationStats.mediaDuration > 0 && (
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-purple-500" /> Media ({formatDuration(rotationStats.mediaDuration)})</div>
+              )}
+              {rotationStats.qrDuration > 0 && (
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-indigo-500" /> QR-linkit ({formatDuration(rotationStats.qrDuration)})</div>
+              )}
+              {rotationStats.rssDuration > 0 && (
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-orange-600" /> RSS ({formatDuration(rotationStats.rssDuration)})</div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="bg-indigo-600 text-white overflow-hidden relative">
         <CardContent className="p-8 relative z-10">
           <div className="max-w-xl space-y-4">
@@ -162,6 +302,67 @@ export function Dashboard() {
             </p>
           </div>
           <FileText className="absolute right-[-20px] bottom-[-20px] h-64 w-64 text-white/10 rotate-12" />
+        </CardContent>
+      </Card>
+
+      <Card className="bg-white border-slate-200 shadow-sm">
+        <CardHeader className="border-b border-slate-100 bg-slate-50/50">
+          <CardTitle className="text-xl font-bold text-slate-800">Pikaohje – Näin käytät InfoTV:tä</CardTitle>
+        </CardHeader>
+        <CardContent className="p-6">
+          <div className="grid md:grid-cols-2 gap-8">
+            <div className="space-y-4">
+              <div className="flex gap-3">
+                <div className="mt-1 bg-blue-100 text-blue-600 p-2 rounded-lg h-fit">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-900 text-lg">1. Sisällön hallinta (Julkaisut)</h3>
+                  <p className="text-slate-600 mt-1 leading-relaxed">
+                    Kaikki näytöllä pyörivä sisältö (tiedotteet, kuvat, tapahtumat, QR-koodit ja RSS-syötteet) lisätään ja hallitaan <strong>Julkaisut</strong>-välilehdellä. Voit ajastaa sisältöä näkymään vain tiettynä aikana ja määrittää, kuinka kauan kukin julkaisu näkyy ruudulla.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <div className="mt-1 bg-indigo-100 text-indigo-600 p-2 rounded-lg h-fit">
+                  <Megaphone className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-900 text-lg">2. InfoTV-näytön avaaminen</h3>
+                  <p className="text-slate-600 mt-1 leading-relaxed">
+                    Saat varsinaisen infonäytön auki vasemman valikon <strong>Avaa näyttö</strong> -painikkeesta. Tämä näkymä on tarkoitettu jätettäväksi auki varsinaisille infonäytöille (esim. aulan televisioon tai erilliselle näytölle).
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex gap-3">
+                <div className="mt-1 bg-purple-100 text-purple-600 p-2 rounded-lg h-fit">
+                  <ImageIcon className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-900 text-lg">3. Ulkoasu ja asetukset</h3>
+                  <p className="text-slate-600 mt-1 leading-relaxed">
+                    <strong>Asetukset</strong>-välilehdellä voit vaihtaa organisaatiosi logon, muokata näytön teemavärejä (tausta ja tekstit) sekä kytkeä sää-widgetin päälle haluamallesi paikkakunnalle.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <div className="mt-1 bg-orange-100 text-orange-600 p-2 rounded-lg h-fit">
+                  <Calendar className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-900 text-lg">4. Tekoälyavustaja (Gemini)</h3>
+                  <p className="text-slate-600 mt-1 leading-relaxed">
+                    Sisältöä luodessa voit hyödyntää tekoälyä. Voit pyytää sitä esimerkiksi tiivistämään pitkän tekstin, ehdottamaan iskeviä otsikoita tai muuttamaan tekstin sävyä virallisemmaksi tai innostavammaksi.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>

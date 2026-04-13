@@ -62,6 +62,11 @@ export interface DisplaySettings {
   show_opening_hours: boolean;
   opening_hours_text: string | null;
   fallback_message: string | null;
+  logo_url?: string | null;
+  show_weather?: boolean;
+  weather_lat?: number;
+  weather_lon?: number;
+  weather_location_name?: string;
   accent_color: string;
   theme: 'light' | 'dark';
   updated_at: Timestamp | string;

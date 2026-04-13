@@ -7,20 +7,17 @@ service firebase.storage {
     
     function isAdmin() {
       return isAuthenticated() && 
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+        firestore.get(/databases/ai-studio-2dd96f32-2dae-4cf2-80ec-0bfb5309cfbd/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
     function isEditor() {
       return isAuthenticated() && 
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'editor'];
+        firestore.get(/databases/ai-studio-2dd96f32-2dae-4cf2-80ec-0bfb5309cfbd/documents/users/$(request.auth.uid)).data.role in ['admin', 'editor'];
     }
 
     match /content/{orgId}/{allPaths=**} {
       allow read: if true;
-      allow write: if isEditor() && (
-        isAdmin() || 
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.org_id == orgId
-      );
+      allow write: if isAuthenticated();
     }
   }
 }

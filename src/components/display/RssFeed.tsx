@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '../../lib/firebase';
+import { isMockFirebase } from '../../lib/firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import { Rss, Clock, User } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -29,9 +28,79 @@ export function RssFeed({ url, isLight }: RssFeedProps) {
   useEffect(() => {
     async function fetchFeed() {
       try {
-        const fetchRss = httpsCallable(functions, 'fetchRssFeed');
-        const result = await fetchRss({ url });
-        setFeed(result.data as any);
+        if (isMockFirebase) {
+          setFeed({
+            title: "Mock RSS Feed",
+            items: [
+              {
+                title: "Mock Uutinen 1",
+                link: "#",
+                pubDate: new Date().toISOString(),
+                contentSnippet: "Tämä on mock-uutinen 1.",
+                content: "Tämä on mock-uutinen 1.",
+                creator: "Ylläpito"
+              },
+              {
+                title: "Mock Uutinen 2",
+                link: "#",
+                pubDate: new Date(Date.now() - 3600000).toISOString(),
+                contentSnippet: "Tämä on mock-uutinen 2.",
+                content: "Tämä on mock-uutinen 2.",
+                creator: "Ylläpito"
+              }
+            ]
+          });
+          setLoading(false);
+          return;
+        }
+
+        // Use a CORS proxy to fetch the RSS feed directly from the client
+        const CORS_PROXY = "https://corsproxy.io/?";
+        const response = await fetch(CORS_PROXY + encodeURIComponent(url));
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const xmlText = await response.text();
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+        
+        // Basic RSS/Atom parsing
+        const isAtom = xmlDoc.querySelector('feed') !== null;
+        const items: RssItem[] = [];
+        
+        if (isAtom) {
+          const title = xmlDoc.querySelector('feed > title')?.textContent || 'RSS-syöte';
+          const entries = xmlDoc.querySelectorAll('entry');
+          entries.forEach(entry => {
+            items.push({
+              title: entry.querySelector('title')?.textContent || '',
+              link: entry.querySelector('link')?.getAttribute('href') || '',
+              pubDate: entry.querySelector('updated')?.textContent || entry.querySelector('published')?.textContent || new Date().toISOString(),
+              contentSnippet: entry.querySelector('summary')?.textContent || entry.querySelector('content')?.textContent?.replace(/<[^>]*>?/gm, '').substring(0, 150) || '',
+              content: entry.querySelector('content')?.textContent || entry.querySelector('summary')?.textContent || '',
+              creator: entry.querySelector('author > name')?.textContent || undefined
+            });
+          });
+          setFeed({ title, items: items.slice(0, 10) });
+        } else {
+          // RSS 2.0
+          const title = xmlDoc.querySelector('channel > title')?.textContent || 'RSS-syöte';
+          const elements = xmlDoc.querySelectorAll('item');
+          elements.forEach(item => {
+            items.push({
+              title: item.querySelector('title')?.textContent || '',
+              link: item.querySelector('link')?.textContent || '',
+              pubDate: item.querySelector('pubDate')?.textContent || new Date().toISOString(),
+              contentSnippet: item.querySelector('description')?.textContent?.replace(/<[^>]*>?/gm, '').substring(0, 150) || '',
+              content: item.querySelector('content\\:encoded')?.textContent || item.querySelector('description')?.textContent || '',
+              creator: item.querySelector('dc\\:creator')?.textContent || item.querySelector('creator')?.textContent || undefined
+            });
+          });
+          setFeed({ title, items: items.slice(0, 10) });
+        }
+        
         setLoading(false);
       } catch (err: any) {
         console.error('Error fetching RSS:', err);

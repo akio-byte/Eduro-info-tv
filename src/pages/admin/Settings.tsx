@@ -1,6 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { db, isMockFirebase } from '../../lib/firebase';
+import { db, isMockFirebase, storage } from '../../lib/firebase';
 import { collection, onSnapshot, query, limit, updateDoc, doc, setDoc, getDocs, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-utils';
 import { mockSettings } from '../../lib/mock-data';
 import type { DisplaySettings } from '../../types/firestore';
@@ -31,7 +32,7 @@ export function Settings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-  const { role } = useAuth();
+  const { role, orgId } = useAuth();
 
   useEffect(() => {
     if (role !== 'admin') {
@@ -228,6 +229,55 @@ export function Settings() {
               </div>
             </div>
 
+            <div className="space-y-4">
+              <Label>Logo</Label>
+              {settings.logo_url ? (
+                <div className="flex items-center gap-4">
+                  <div className="p-2 border rounded-lg bg-white">
+                    <img src={settings.logo_url} alt="Logo preview" className="max-h-16 object-contain" />
+                  </div>
+                  <Button type="button" variant="outline" onClick={() => setSettings({ ...settings, logo_url: null })}>
+                    Poista logo
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Input 
+                    type="file" 
+                    accept="image/png, image/jpeg, image/svg+xml"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (file.size > 2 * 1024 * 1024) {
+                        setMessage({ type: 'error', text: 'Tiedosto on liian suuri (max 2 MB).' });
+                        return;
+                      }
+                      
+                      if (isMockFirebase) {
+                        setSettings({ ...settings, logo_url: 'https://picsum.photos/seed/logo/200/80' });
+                        return;
+                      }
+
+                      try {
+                        setSaving(true);
+                        const fileRef = ref(storage, `branding/${orgId}/logo-${Date.now()}.${file.name.split('.').pop()}`);
+                        await uploadBytes(fileRef, file);
+                        const url = await getDownloadURL(fileRef);
+                        setSettings({ ...settings, logo_url: url });
+                        setMessage({ type: 'success', text: 'Logo ladattu onnistuneesti.' });
+                      } catch (error) {
+                        console.error('Logo upload error:', error);
+                        setMessage({ type: 'error', text: 'Logon lataus epäonnistui.' });
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                  />
+                  <p className="text-sm text-slate-500">Suositeltu koko: 400×120 px, PNG tai SVG läpinäkyvällä taustalla.</p>
+                </div>
+              )}
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="accentColor">Teeman korostusväri</Label>
               <div className="flex items-center space-x-3">
@@ -380,6 +430,64 @@ export function Settings() {
                 </div>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Sun className="h-5 w-5 text-indigo-600" />
+              <CardTitle>Sää</CardTitle>
+            </div>
+            <CardDescription>Sää haetaan Open-Meteo-palvelusta ilman API-avainta.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="showWeather">Näytä sää</Label>
+                <p className="text-sm text-slate-500">Näytä paikallinen sää yläpalkissa</p>
+              </div>
+              <Switch
+                id="showWeather"
+                checked={settings.show_weather || false}
+                onCheckedChange={(checked) => setSettings({ ...settings, show_weather: checked })}
+              />
+            </div>
+            {settings.show_weather && (
+              <div className="space-y-4 pt-4 border-t border-slate-100">
+                <div className="space-y-2">
+                  <Label htmlFor="weatherLocationName">Paikkakunnan nimi</Label>
+                  <Input
+                    id="weatherLocationName"
+                    value={settings.weather_location_name || ''}
+                    onChange={(e) => setSettings({ ...settings, weather_location_name: e.target.value })}
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="weatherLat">Leveysaste (Latitude)</Label>
+                    <Input
+                      id="weatherLat"
+                      type="number"
+                      step="any"
+                      value={settings.weather_lat || ''}
+                      onChange={(e) => setSettings({ ...settings, weather_lat: parseFloat(e.target.value) })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="weatherLon">Pituusaste (Longitude)</Label>
+                    <Input
+                      id="weatherLon"
+                      type="number"
+                      step="any"
+                      value={settings.weather_lon || ''}
+                      onChange={(e) => setSettings({ ...settings, weather_lon: parseFloat(e.target.value) })}
+                    />
+                  </div>
+                </div>
+                <p className="text-sm text-slate-500">Oletus: Rovaniemi (66.5039, 25.7294)</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 

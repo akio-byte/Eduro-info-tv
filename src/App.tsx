@@ -11,7 +11,6 @@ import { Dashboard } from './pages/admin/Dashboard';
 import { Content } from './pages/admin/Content';
 import { Users } from './pages/admin/Users';
 import { Settings } from './pages/admin/Settings';
-import { Preview } from './pages/admin/Preview';
 import { Display } from './pages/display/Display';
 
 export default function App() {
@@ -29,7 +28,6 @@ export default function App() {
             <Route path="content" element={<Content />} />
             <Route path="users" element={<Users />} />
             <Route path="settings" element={<Settings />} />
-            <Route path="preview" element={<Preview />} />
             <Route path="*" element={<Navigate to="/admin" replace />} />
           </Route>
         </Routes>

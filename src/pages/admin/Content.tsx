@@ -192,7 +192,7 @@ export function Content() {
       let errorText = 'Tiedoston lataus epäonnistui.';
       
       if (error.code === 'storage/unauthorized') {
-        errorText = 'Ei oikeuksia tallennustilaan. Varmista, että Storage on otettu käyttöön Firebase-konsolissa.';
+        errorText = 'Ei oikeuksia tallennustilaan. Varmista, että Storage on otettu käyttöön Firebase-konsolissa ja säännöt on päivitetty.';
       } else if (error.message) {
         errorText = error.message;
       }
