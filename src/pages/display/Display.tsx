@@ -26,12 +26,6 @@ export function Display() {
     !!settings?.show_weather
   );
 
-  // Update time every second
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
   // Fetch data initially and set up real-time listeners
   useEffect(() => {
     if (isMockFirebase) {

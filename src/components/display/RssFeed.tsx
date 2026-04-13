@@ -55,7 +55,7 @@ export function RssFeed({ url, isLight }: RssFeedProps) {
         }
 
         // Use a CORS proxy to fetch the RSS feed directly from the client
-        const CORS_PROXY = "https://corsproxy.io/?";
+        const CORS_PROXY = "https://api.allorigins.win/raw?url=";
         const response = await fetch(CORS_PROXY + encodeURIComponent(url));
         
         if (!response.ok) {
