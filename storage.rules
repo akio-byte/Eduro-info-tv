@@ -6,7 +6,7 @@ service firebase.storage {
     }
     
     function getUserData() {
-      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+      return firestore.get(/databases/ai-studio-2dd96f32-2dae-4cf2-80ec-0bfb5309cfbd/documents/users/$(request.auth.uid)).data;
     }
 
     function isAdmin() {
