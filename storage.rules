@@ -5,24 +5,30 @@ service firebase.storage {
       return request.auth != null;
     }
     
+    function getUserData() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+
     function isAdmin() {
-      return isAuthenticated() && 
-        firestore.get(/databases/ai-studio-2dd96f32-2dae-4cf2-80ec-0bfb5309cfbd/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return isAuthenticated() && getUserData().role == 'admin';
     }
 
     function isEditor() {
-      return isAuthenticated() && 
-        firestore.get(/databases/ai-studio-2dd96f32-2dae-4cf2-80ec-0bfb5309cfbd/documents/users/$(request.auth.uid)).data.role in ['admin', 'editor'];
+      return isAuthenticated() && getUserData().role in ['admin', 'editor'];
+    }
+
+    function isOrgMember(orgId) {
+      return isAuthenticated() && getUserData().org_id == orgId;
     }
 
     match /content/{orgId}/{allPaths=**} {
       allow read: if true;
-      allow write: if isAuthenticated();
+      allow write: if isEditor() && isOrgMember(orgId);
     }
 
     match /branding/{orgId}/{allPaths=**} {
       allow read: if true;
-      allow write: if request.auth != null
+      allow write: if isAdmin() && isOrgMember(orgId)
                    && request.resource.size < 2 * 1024 * 1024
                    && request.resource.contentType.matches('image/.*');
     }
