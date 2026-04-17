@@ -99,12 +99,14 @@ service cloud.firestore {
     
     function isAdmin() {
       return isAuthenticated() && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "aki.oksala@gmail.com" && request.auth.token.email_verified == true));
     }
     
     function isEditor() {
       return isAuthenticated() && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'editor'];
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'editor'] ||
+         (request.auth.token.email == "aki.oksala@gmail.com" && request.auth.token.email_verified == true));
     }
 
     function getUserOrg() {
@@ -112,7 +114,7 @@ service cloud.firestore {
     }
 
     function isOrgMember(orgId) {
-      return isAuthenticated() && getUserOrg() == orgId;
+      return isAuthenticated() && (getUserOrg() == orgId || (request.auth.token.email == "aki.oksala@gmail.com" && request.auth.token.email_verified == true));
     }
     
     function isValidEmail(email) {

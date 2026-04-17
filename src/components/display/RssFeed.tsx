@@ -55,7 +55,7 @@ export function RssFeed({ url, isLight }: RssFeedProps) {
         }
 
         // Use a CORS proxy to fetch the RSS feed directly from the client
-        const CORS_PROXY = "https://api.allorigins.win/raw?url=";
+        const CORS_PROXY = "https://api.codetabs.com/v1/proxy?quest=";
         const response = await fetch(CORS_PROXY + encodeURIComponent(url));
         
         if (!response.ok) {
