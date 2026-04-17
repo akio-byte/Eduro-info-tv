@@ -175,27 +175,30 @@ export function Display() {
     }`}>
       {/* Main Content Area */}
       <main className="flex-1 relative flex flex-col">
-        {/* Logo — ankkuroitu vasempaan yläkulmaan */}
-        <div className="absolute top-4 left-4 z-30">
-          {settings.logo_url ? (
-            <img
-              src={settings.logo_url}
-              alt={settings.org_name}
-              className="h-16 w-auto max-w-[260px] object-contain drop-shadow-md"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <div
-              className="h-16 w-16 rounded-2xl flex items-center justify-center text-white font-bold text-3xl shadow-lg shadow-indigo-500/20"
-              style={{ backgroundColor: settings.accent_color || '#4f46e5' }}
-            >
-              {(settings.org_name || 'E').charAt(0)}
+        {/* Header */}
+        <header className="flex items-center justify-between px-10 py-6 z-10">
+          <div className="flex items-center space-x-6">
+            {settings.logo_url ? (
+              <img src={settings.logo_url} alt={settings.org_name} className="h-14 w-auto max-w-[240px] object-contain" referrerPolicy="no-referrer" />
+            ) : (
+              <div 
+                className="h-14 w-14 rounded-2xl flex items-center justify-center text-white font-bold text-3xl shadow-lg shadow-indigo-500/20"
+                style={{ backgroundColor: settings.accent_color || '#4f46e5' }}
+              >
+                {(settings.org_name || 'E').charAt(0)}
+              </div>
+            )}
+            <div>
+              <h1 className={`text-4xl font-bold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                {settings.org_name || 'Eduro'}
+              </h1>
+              {settings.welcome_text && (
+                <p className={`text-xl font-medium ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                  {settings.welcome_text}
+                </p>
+              )}
             </div>
-          )}
-        </div>
-
-        {/* Header — vain sää & kello oikealla */}
-        <header className="flex items-center justify-end px-10 py-6 z-10">
+          </div>
           <div className="flex items-center gap-8">
             {settings.show_weather && weatherData && (() => {
               const { icon } = weatherCodeToIcon(weatherData.weatherCode, weatherData.isDay);
@@ -252,29 +255,25 @@ export function Display() {
               >
                 {/* Media Side (if any) */}
                 {currentContent.media_url && (
-                  <div className={`relative ${currentContent.body ? 'w-1/2' : 'w-full'} ${
-                    isLight ? 'bg-slate-100' : 'bg-slate-950'
-                  }`}>
-                    {!currentContent.body && (
-                      <div className={`absolute inset-0 z-10 pointer-events-none ${
-                        isLight
-                          ? 'bg-gradient-to-t from-white/60 via-transparent to-transparent'
-                          : 'bg-gradient-to-t from-slate-950/70 via-transparent to-transparent'
-                      }`} />
-                    )}
+                  <div className={`relative ${currentContent.body ? 'w-1/2' : 'w-full'}`}>
+                    <div className={`absolute inset-0 z-10 ${
+                      isLight 
+                        ? 'bg-gradient-to-r from-white/10 to-white/40' 
+                        : 'bg-gradient-to-r from-slate-900/10 to-slate-900/40'
+                    }`} />
                     {currentContent.media_type === 'video' ? (
-                      <video
-                        src={currentContent.media_url}
-                        autoPlay
-                        muted
-                        loop
-                        className="absolute inset-0 h-full w-full object-contain"
+                      <video 
+                        src={currentContent.media_url} 
+                        autoPlay 
+                        muted 
+                        loop 
+                        className="absolute inset-0 h-full w-full object-cover"
                       />
                     ) : (
-                      <img
-                        src={currentContent.media_url}
-                        alt={currentContent.title || 'Infonäytön kuva'}
-                        className="absolute inset-0 h-full w-full object-contain"
+                      <img 
+                        src={currentContent.media_url} 
+                        alt={currentContent.title || 'Infonäytön kuva'} 
+                        className="absolute inset-0 h-full w-full object-cover"
                         referrerPolicy="no-referrer"
                       />
                     )}

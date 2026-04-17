@@ -118,13 +118,10 @@ export function RssFeed({ url, isLight }: RssFeedProps) {
   // Rotate items within the RSS view
   useEffect(() => {
     if (!feed || feed.items.length <= 1) return;
-
-    // Rajoita activeItemIndex, jos feed lyheni päivityksessä
-    setActiveItemIndex((prev) => prev % feed.items.length);
-
+    
     const timer = setInterval(() => {
       setActiveItemIndex((prev) => (prev + 1) % feed.items.length);
-    }, 12000); // Rotate every 12 seconds
+    }, 8000); // Rotate every 8 seconds
 
     return () => clearInterval(timer);
   }, [feed]);
@@ -173,10 +170,10 @@ export function RssFeed({ url, isLight }: RssFeedProps) {
         <AnimatePresence mode="wait">
           <motion.div
             key={activeItemIndex}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -16 }}
-            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
             className="space-y-8"
           >
             <h2 className={`text-6xl font-bold leading-[1.1] ${isLight ? 'text-slate-900' : 'text-white'}`}>
@@ -208,26 +205,14 @@ export function RssFeed({ url, isLight }: RssFeedProps) {
       {/* Progress dots */}
       <div className="flex gap-2 mt-8">
         {feed.items.map((_, i) => (
-          <div
+          <div 
             key={i}
-            className={`h-2 rounded-full overflow-hidden transition-all duration-700 ${
-              i === activeItemIndex
-                ? 'w-16 bg-slate-700/40'
-                : i < activeItemIndex
-                  ? 'w-2 bg-indigo-500/60'
-                  : 'w-2 bg-slate-700'
+            className={`h-2 rounded-full transition-all duration-500 ${
+              i === activeItemIndex 
+                ? 'w-12 bg-indigo-500' 
+                : 'w-2 bg-slate-700'
             }`}
-          >
-            {i === activeItemIndex && (
-              <motion.div
-                key={`bar-${activeItemIndex}`}
-                className="h-full bg-indigo-500"
-                initial={{ width: '0%' }}
-                animate={{ width: '100%' }}
-                transition={{ duration: 12, ease: 'linear' }}
-              />
-            )}
-          </div>
+          />
         ))}
       </div>
     </div>
