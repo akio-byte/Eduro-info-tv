@@ -5,32 +5,26 @@ service firebase.storage {
       return request.auth != null;
     }
     
-    function getUserData() {
-      return firestore.get(/databases/ai-studio-2dd96f32-2dae-4cf2-80ec-0bfb5309cfbd/documents/users/$(request.auth.uid)).data;
-    }
-
-    function isAdmin() {
-      return isAuthenticated() && getUserData().role == 'admin';
-    }
-
-    function isEditor() {
-      return isAuthenticated() && getUserData().role in ['admin', 'editor'];
-    }
-
-    function isOrgMember(orgId) {
-      return isAuthenticated() && getUserData().org_id == orgId;
-    }
-
-    match /content/{orgId}/{allPaths=**} {
-      allow read: if true;
-      allow write: if isEditor() && isOrgMember(orgId);
+    function isBootstrapAdmin() {
+      return isAuthenticated() && request.auth.token.email == "aki.oksala@gmail.com";
     }
 
     match /branding/{orgId}/{allPaths=**} {
       allow read: if true;
-      allow write: if isAdmin() && isOrgMember(orgId)
-                   && request.resource.size < 2 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
+      allow write: if isBootstrapAdmin() || (
+        isAuthenticated() && 
+        firestore.get(/databases/ai-studio-2dd96f32-2dae-4cf2-80ec-0bfb5309cfbd/documents/users/$(request.auth.uid)).data.role == 'admin' &&
+        request.resource.size < 5 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.*')
+      );
+    }
+
+    match /content/{orgId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isBootstrapAdmin() || (
+        isAuthenticated() && 
+        firestore.get(/databases/ai-studio-2dd96f32-2dae-4cf2-80ec-0bfb5309cfbd/documents/users/$(request.auth.uid)).data.role in ['admin', 'editor']
+      );
     }
   }
 }

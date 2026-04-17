@@ -99,14 +99,16 @@ service cloud.firestore {
     
     function isAdmin() {
       return isAuthenticated() && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-         (request.auth.token.email == "aki.oksala@gmail.com" && request.auth.token.email_verified == true));
+        ((request.auth.token.email == "aki.oksala@gmail.com" && request.auth.token.email_verified == true) ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
     }
     
     function isEditor() {
       return isAuthenticated() && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'editor'] ||
-         (request.auth.token.email == "aki.oksala@gmail.com" && request.auth.token.email_verified == true));
+        ((request.auth.token.email == "aki.oksala@gmail.com" && request.auth.token.email_verified == true) ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'editor']));
     }
 
     function getUserOrg() {
@@ -114,7 +116,11 @@ service cloud.firestore {
     }
 
     function isOrgMember(orgId) {
-      return isAuthenticated() && (getUserOrg() == orgId || (request.auth.token.email == "aki.oksala@gmail.com" && request.auth.token.email_verified == true));
+      return isAuthenticated() && (
+        (request.auth.token.email == "aki.oksala@gmail.com" && request.auth.token.email_verified == true) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.org_id == orgId)
+      );
     }
     
     function isValidEmail(email) {
