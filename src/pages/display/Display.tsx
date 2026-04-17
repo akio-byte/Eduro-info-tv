@@ -176,17 +176,21 @@ export function Display() {
       {/* Main Content Area */}
       <main className="flex-1 relative flex flex-col">
         {/* Logo — ankkuroitu vasempaan yläkulmaan */}
-        <div className="absolute top-4 left-4 z-30">
+        <div className="absolute top-8 left-10 z-30">
           {settings.logo_url ? (
             <img
               src={settings.logo_url}
               alt={settings.org_name}
-              className="h-16 w-auto max-w-[260px] object-contain drop-shadow-md"
+              className={`h-20 w-auto max-w-[320px] object-contain object-left ${
+                isLight
+                  ? '[filter:drop-shadow(0_2px_4px_rgb(15_23_42/0.15))]'
+                  : '[filter:drop-shadow(0_2px_6px_rgb(0_0_0/0.55))]'
+              }`}
               referrerPolicy="no-referrer"
             />
           ) : (
             <div
-              className="h-16 w-16 rounded-2xl flex items-center justify-center text-white font-bold text-3xl shadow-lg shadow-indigo-500/20"
+              className="h-20 w-20 rounded-2xl flex items-center justify-center text-white font-bold text-4xl shadow-xl shadow-indigo-500/25"
               style={{ backgroundColor: settings.accent_color || '#4f46e5' }}
             >
               {(settings.org_name || 'E').charAt(0)}
