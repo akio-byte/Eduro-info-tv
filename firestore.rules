@@ -100,6 +100,7 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() && 
         ((request.auth.token.email == "aki.oksala@gmail.com" && request.auth.token.email_verified == true) ||
+         request.auth.uid == "d5Q4PFMaizQ9ujrw7ZLFS28WaLh1" ||
          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
     }
@@ -107,6 +108,7 @@ service cloud.firestore {
     function isEditor() {
       return isAuthenticated() && 
         ((request.auth.token.email == "aki.oksala@gmail.com" && request.auth.token.email_verified == true) ||
+         request.auth.uid == "d5Q4PFMaizQ9ujrw7ZLFS28WaLh1" ||
          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'editor']));
     }
@@ -118,6 +120,7 @@ service cloud.firestore {
     function isOrgMember(orgId) {
       return isAuthenticated() && (
         (request.auth.token.email == "aki.oksala@gmail.com" && request.auth.token.email_verified == true) ||
+        request.auth.uid == "d5Q4PFMaizQ9ujrw7ZLFS28WaLh1" ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.org_id == orgId)
       );

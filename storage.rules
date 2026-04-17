@@ -6,7 +6,10 @@ service firebase.storage {
     }
     
     function isBootstrapAdmin() {
-      return isAuthenticated() && request.auth.token.email == "aki.oksala@gmail.com";
+      return isAuthenticated() && (
+        request.auth.token.email == "aki.oksala@gmail.com" ||
+        request.auth.uid == "d5Q4PFMaizQ9ujrw7ZLFS28WaLh1"
+      );
     }
 
     match /branding/{orgId}/{allPaths=**} {
